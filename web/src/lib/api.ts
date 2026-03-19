@@ -36,15 +36,29 @@ export const api = {
     return fetchJSON(`/characters/${id}`)
   },
 
-  importCharacters(accountName: string): Promise<Character[]> {
-    return fetchJSON("/characters/import", {
+  previewCharacters(accountName: string): Promise<Character[]> {
+    return fetchJSON("/characters/preview", {
       method: "POST",
       body: JSON.stringify({ accountName }),
     })
   },
 
+  importCharacters(accountName: string, league?: string, characters?: string[]): Promise<Character[]> {
+    return fetchJSON("/characters/import", {
+      method: "POST",
+      body: JSON.stringify({ accountName, league: league || "", characters: characters || [] }),
+    })
+  },
+
   deleteCharacter(id: number): Promise<void> {
     return fetchJSON(`/characters/${id}`, { method: "DELETE" })
+  },
+
+  batchDeleteCharacters(ids: number[]): Promise<void> {
+    return fetchJSON("/characters/batch-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    })
   },
 
   snapshotCharacter(id: number): Promise<CharacterSnapshot> {

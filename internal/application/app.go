@@ -61,7 +61,9 @@ func New(cfg *config.Config) (*App, error) {
 
 	// Character routes
 	api.HandleFunc("/characters", h.ListCharacters).Methods("GET")
+	api.HandleFunc("/characters/preview", h.PreviewCharacters).Methods("POST")
 	api.HandleFunc("/characters/import", h.ImportCharacters).Methods("POST")
+	api.HandleFunc("/characters/batch-delete", h.BatchDeleteCharacters).Methods("POST")
 	api.HandleFunc("/characters/leagues", h.ListLeagues).Methods("GET")
 	api.HandleFunc("/characters/accounts", h.ListAccounts).Methods("GET")
 	api.HandleFunc("/characters/{id:[0-9]+}", h.GetCharacter).Methods("GET")

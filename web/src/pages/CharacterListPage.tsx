@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatDate } from "@/lib/utils"
-import { Download, Camera, Trash2, Search, Filter, Users } from "lucide-react"
+import { Download, Camera, Trash2, Search, Filter, Users, X, CheckSquare, Square } from "lucide-react"
 
 export function CharacterListPage() {
   const [characters, setCharacters] = useState<Character[]>([])
@@ -17,8 +17,19 @@ export function CharacterListPage() {
   const [selectedAccount, setSelectedAccount] = useState("")
   const [accountName, setAccountName] = useState("")
   const [loading, setLoading] = useState(false)
-  const [importing, setImporting] = useState(false)
   const [error, setError] = useState("")
+
+  // Import preview state
+  const [previewing, setPreviewing] = useState(false)
+  const [previewChars, setPreviewChars] = useState<Character[]>([])
+  const [previewLeague, setPreviewLeague] = useState("")
+  const [previewSelected, setPreviewSelected] = useState<Set<string>>(new Set())
+  const [importing, setImporting] = useState(false)
+  const [previewAccount, setPreviewAccount] = useState("")
+
+  // Batch delete state
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     loadFilters()
@@ -57,16 +68,75 @@ export function CharacterListPage() {
     }
   }
 
-  async function handleImport() {
+  async function handlePreview() {
     if (!accountName.trim()) return
+    setPreviewing(true)
+    setError("")
+    try {
+      const chars = await api.previewCharacters(accountName.trim())
+      const charList = Array.isArray(chars) ? chars : []
+      setPreviewChars(charList)
+      setPreviewAccount(accountName.trim())
+
+      // Find available leagues and default to a non-Standard league if available
+      const previewLeagues = [...new Set(charList.map((c) => c.league).filter(Boolean))]
+      const nonStandard = previewLeagues.filter((l) => l !== "Standard" && l !== "Standard HC")
+      const defaultLeague = nonStandard.length > 0 ? nonStandard[0] : previewLeagues[0] || ""
+      setPreviewLeague(defaultLeague)
+
+      // Pre-select all characters in the default league
+      const inLeague = charList.filter((c) => c.league === defaultLeague)
+      setPreviewSelected(new Set(inLeague.map((c) => c.name)))
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch characters. Make sure the profile is public.")
+    } finally {
+      setPreviewing(false)
+    }
+  }
+
+  function handlePreviewLeagueChange(league: string) {
+    setPreviewLeague(league)
+    const inLeague = previewChars.filter((c) => c.league === league)
+    setPreviewSelected(new Set(inLeague.map((c) => c.name)))
+  }
+
+  function togglePreviewChar(name: string) {
+    setPreviewSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
+
+  function toggleAllPreviewInLeague() {
+    const inLeague = previewChars.filter((c) => c.league === previewLeague)
+    const allSelected = inLeague.every((c) => previewSelected.has(c.name))
+    if (allSelected) {
+      setPreviewSelected(new Set())
+    } else {
+      setPreviewSelected(new Set(inLeague.map((c) => c.name)))
+    }
+  }
+
+  function cancelPreview() {
+    setPreviewChars([])
+    setPreviewLeague("")
+    setPreviewSelected(new Set())
+    setPreviewAccount("")
+  }
+
+  async function handleImport() {
+    if (previewSelected.size === 0) return
     setImporting(true)
     setError("")
     try {
-      await api.importCharacters(accountName.trim())
+      await api.importCharacters(previewAccount, previewLeague, [...previewSelected])
+      cancelPreview()
       setAccountName("")
       await Promise.all([loadCharacters(), loadFilters()])
     } catch (err: any) {
-      setError(err.message || "Failed to import characters. Make sure the profile is public.")
+      setError(err.message || "Failed to import characters.")
     } finally {
       setImporting(false)
     }
@@ -88,6 +158,42 @@ export function CharacterListPage() {
       await loadCharacters()
     } catch (err: any) {
       setError(err.message || "Failed to delete character")
+    }
+  }
+
+  function toggleSelectId(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAllInLeague(leagueChars: Character[]) {
+    const ids = leagueChars.map((c) => c.id)
+    const allSelected = ids.every((id) => selectedIds.has(id))
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (allSelected) {
+        ids.forEach((id) => next.delete(id))
+      } else {
+        ids.forEach((id) => next.add(id))
+      }
+      return next
+    })
+  }
+
+  async function handleBatchDelete() {
+    if (selectedIds.size === 0) return
+    if (!confirm(`Delete ${selectedIds.size} character${selectedIds.size !== 1 ? "s" : ""} and all their snapshots?`)) return
+    try {
+      await api.batchDeleteCharacters([...selectedIds])
+      setSelectedIds(new Set())
+      setSelectMode(false)
+      await Promise.all([loadCharacters(), loadFilters()])
+    } catch (err: any) {
+      setError(err.message || "Failed to delete characters")
     }
   }
 
@@ -116,6 +222,14 @@ export function CharacterListPage() {
     Scion: "bg-gray-700/50 text-gray-300",
   }
 
+  // Preview leagues
+  const previewLeagues = [...new Set(previewChars.map((c) => c.league).filter(Boolean))].sort((a, b) => {
+    if (a === "Standard") return 1
+    if (b === "Standard") return -1
+    return a.localeCompare(b)
+  })
+  const previewInLeague = previewChars.filter((c) => c.league === previewLeague)
+
   return (
     <div className="space-y-6">
       <div>
@@ -131,28 +245,103 @@ export function CharacterListPage() {
           <CardTitle className="text-lg">Import Characters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-3">
-            <Input
-              placeholder="PoE Account Name"
-              value={accountName}
-              onChange={(e) => setAccountName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleImport()}
-              className="max-w-sm"
-            />
-            <Button onClick={handleImport} disabled={importing || !accountName.trim()}>
-              <Download className="mr-2 h-4 w-4" />
-              {importing ? "Importing..." : "Import"}
-            </Button>
-          </div>
+          {previewChars.length === 0 ? (
+            <>
+              <div className="flex gap-3">
+                <Input
+                  placeholder="PoE Account Name"
+                  value={accountName}
+                  onChange={(e) => setAccountName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handlePreview()}
+                  className="max-w-sm"
+                />
+                <Button onClick={handlePreview} disabled={previewing || !accountName.trim()}>
+                  <Search className="mr-2 h-4 w-4" />
+                  {previewing ? "Fetching..." : "Find Characters"}
+                </Button>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                The account profile must be set to public on pathofexile.com.
+              </p>
+            </>
+          ) : (
+            <div className="space-y-4">
+              {/* League selector */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-sm font-medium">League:</span>
+                {previewLeagues.map((l) => (
+                  <Button
+                    key={l}
+                    variant={previewLeague === l ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handlePreviewLeagueChange(l)}
+                  >
+                    {l}
+                    <Badge variant="secondary" className="ml-2 text-xs">
+                      {previewChars.filter((c) => c.league === l).length}
+                    </Badge>
+                  </Button>
+                ))}
+                <Button variant="ghost" size="sm" onClick={cancelPreview} className="ml-auto">
+                  <X className="mr-1 h-4 w-4" /> Cancel
+                </Button>
+              </div>
+
+              {/* Character selection */}
+              {previewInLeague.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={toggleAllPreviewInLeague}
+                      className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {previewInLeague.every((c) => previewSelected.has(c.name)) ? (
+                        <CheckSquare className="h-4 w-4" />
+                      ) : (
+                        <Square className="h-4 w-4" />
+                      )}
+                      Select All ({previewInLeague.length})
+                    </button>
+                  </div>
+
+                  <div className="grid gap-1 max-h-64 overflow-y-auto">
+                    {previewInLeague.map((char) => (
+                      <label
+                        key={char.name}
+                        className="flex items-center gap-3 p-2 rounded hover:bg-accent/50 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={previewSelected.has(char.name)}
+                          onChange={() => togglePreviewChar(char.name)}
+                          className="rounded"
+                        />
+                        <span className="font-medium text-sm">{char.name}</span>
+                        <Badge variant="outline" className={`text-xs ${classColors[char.class] || ""}`}>
+                          {char.ascendancy || char.class}
+                        </Badge>
+                        <span className="font-mono text-xs">Lv {char.level}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  <Button
+                    onClick={handleImport}
+                    disabled={importing || previewSelected.size === 0}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    {importing ? "Importing..." : `Import ${previewSelected.size} Character${previewSelected.size !== 1 ? "s" : ""}`}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
           {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
-          <p className="mt-2 text-xs text-muted-foreground">
-            The account profile must be set to public on pathofexile.com.
-          </p>
         </CardContent>
       </Card>
 
-      {/* Filters */}
-      {(leagues.length > 0 || accounts.length > 0) && (
+      {/* Filters & Batch Actions */}
+      {(leagues.length > 0 || accounts.length > 0 || characters.length > 0) && (
         <div className="flex flex-wrap gap-3 items-center">
           <Filter className="h-4 w-4 text-muted-foreground" />
 
@@ -191,6 +380,36 @@ export function CharacterListPage() {
               Clear Filters
             </Button>
           )}
+
+          <div className="ml-auto flex gap-2">
+            {selectMode ? (
+              <>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={selectedIds.size === 0}
+                  onClick={handleBatchDelete}
+                >
+                  <Trash2 className="mr-1 h-4 w-4" />
+                  Delete {selectedIds.size > 0 ? `(${selectedIds.size})` : ""}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setSelectMode(false); setSelectedIds(new Set()) }}
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              characters.length > 0 && (
+                <Button variant="outline" size="sm" onClick={() => setSelectMode(true)}>
+                  <CheckSquare className="mr-1 h-4 w-4" />
+                  Select
+                </Button>
+              )
+            )}
+          </div>
         </div>
       )}
 
@@ -211,6 +430,19 @@ export function CharacterListPage() {
             <div key={league}>
               {/* League Header */}
               <div className="flex items-center gap-2 mb-3">
+                {selectMode && (
+                  <button
+                    onClick={() => toggleSelectAllInLeague(charsByLeague[league])}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    title="Select all in league"
+                  >
+                    {charsByLeague[league].every((c) => selectedIds.has(c.id)) ? (
+                      <CheckSquare className="h-4 w-4" />
+                    ) : (
+                      <Square className="h-4 w-4" />
+                    )}
+                  </button>
+                )}
                 <h2 className="text-lg font-semibold">{league}</h2>
                 <Badge variant="secondary" className="text-xs">
                   {charsByLeague[league].length} character{charsByLeague[league].length !== 1 ? "s" : ""}
@@ -220,10 +452,21 @@ export function CharacterListPage() {
               {/* Characters in this league */}
               <div className="grid gap-2">
                 {charsByLeague[league].map((char) => (
-                  <Card key={char.id} className="hover:bg-accent/50 transition-colors">
+                  <Card
+                    key={char.id}
+                    className={`hover:bg-accent/50 transition-colors ${selectMode && selectedIds.has(char.id) ? "ring-1 ring-primary" : ""}`}
+                  >
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4 flex-1 min-w-0">
+                          {selectMode && (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(char.id)}
+                              onChange={() => toggleSelectId(char.id)}
+                              className="rounded"
+                            />
+                          )}
                           <div className="min-w-0">
                             <Link
                               to={`/characters/${char.id}`}
@@ -245,24 +488,26 @@ export function CharacterListPage() {
                           </span>
                         </div>
 
-                        <div className="flex gap-1 ml-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleSnapshot(char.id)}
-                            title="Take Snapshot"
-                          >
-                            <Camera className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(char.id)}
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
+                        {!selectMode && (
+                          <div className="flex gap-1 ml-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleSnapshot(char.id)}
+                              title="Take Snapshot"
+                            >
+                              <Camera className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(char.id)}
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
