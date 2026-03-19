@@ -143,7 +143,7 @@ export function CharacterDetailPage() {
           </TabsList>
 
           <TabsContent value="gear">
-            <GearPanel items={activeSnapshot.items || []} />
+            <GearPanel items={activeSnapshot.items || []} gems={activeSnapshot.gems || []} />
           </TabsContent>
 
           <TabsContent value="gems">
