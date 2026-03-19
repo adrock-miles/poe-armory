@@ -112,15 +112,24 @@ type MasteryAlloc struct {
 
 // TreeJewel represents a jewel socketed in the passive tree.
 type TreeJewel struct {
-	NodeHash     int      `json:"nodeHash"`
-	ItemID       string   `json:"itemId"`
-	Name         string   `json:"name"`
-	TypeLine     string   `json:"typeLine"`
-	BaseType     string   `json:"baseType,omitempty"`
-	FrameType    int      `json:"frameType"`
-	IconURL      string   `json:"iconUrl,omitempty"`
-	ImplicitMods []string `json:"implicitMods,omitempty"`
-	ExplicitMods []string `json:"explicitMods,omitempty"`
+	NodeHash       int              `json:"nodeHash"`
+	ItemID         string           `json:"itemId"`
+	Name           string           `json:"name"`
+	TypeLine       string           `json:"typeLine"`
+	BaseType       string           `json:"baseType,omitempty"`
+	FrameType      int              `json:"frameType"`
+	IconURL        string           `json:"iconUrl,omitempty"`
+	ImplicitMods   []string         `json:"implicitMods,omitempty"`
+	ExplicitMods   []string         `json:"explicitMods,omitempty"`
+	ClusterPassives []ClusterPassive `json:"clusterPassives,omitempty"`
+	SubJewels      []TreeJewel      `json:"subJewels,omitempty"`
+}
+
+// ClusterPassive represents a passive node added by a cluster jewel.
+type ClusterPassive struct {
+	Name   string   `json:"name"`
+	Stats  []string `json:"stats,omitempty"`
+	Type   string   `json:"type"` // "notable", "small", "socket"
 }
 
 // AscendancyInfo holds parsed ascendancy data.

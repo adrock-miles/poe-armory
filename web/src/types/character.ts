@@ -97,4 +97,12 @@ export interface TreeJewel {
   iconUrl?: string
   implicitMods?: string[]
   explicitMods?: string[]
+  clusterPassives?: ClusterPassive[]
+  subJewels?: TreeJewel[]
+}
+
+export interface ClusterPassive {
+  name: string
+  stats?: string[]
+  type: "notable" | "small" | "socket"
 }

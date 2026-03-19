@@ -280,10 +280,28 @@ func (c *Client) GetItems(ctx context.Context, accountName, characterName string
 
 // poePassiveResponse is the raw response from get-passive-skills.
 type poePassiveResponse struct {
-	Hashes         []int             `json:"hashes"`
-	HashesEx       []int             `json:"hashes_ex"`
-	MasteryEffects map[string]int    `json:"mastery_effects"`
-	Items          []json.RawMessage `json:"items"`
+	Hashes         []int                              `json:"hashes"`
+	HashesEx       []int                              `json:"hashes_ex"`
+	MasteryEffects map[string]int                     `json:"mastery_effects"`
+	Items          []json.RawMessage                  `json:"items"`
+	JewelData      map[string]poeJewelExpansionData   `json:"jewel_data"`
+}
+
+// poeJewelExpansionData is the cluster jewel expansion subgraph from the API.
+type poeJewelExpansionData struct {
+	Nodes map[string]poeExpansionNode `json:"nodes"`
+}
+
+// poeExpansionNode is a single node in a cluster jewel expansion.
+type poeExpansionNode struct {
+	Name           string   `json:"name"`
+	Skill          int      `json:"skill"`
+	Stats          []string `json:"stats"`
+	IsNotable      bool     `json:"isNotable"`
+	IsJewelSocket  bool     `json:"isJewelSocket"`
+	ExpansionJewel *struct {
+		Size int `json:"size"`
+	} `json:"expansionJewel,omitempty"`
 }
 
 // GetPassiveTree fetches the passive skill tree for a character.
@@ -316,6 +334,32 @@ func (c *Client) GetPassiveTree(ctx context.Context, accountName, characterName 
 		})
 	}
 
+	// Parse cluster jewel expansion data — maps socket nodeHash to expansion subgraph
+	expansionSocketHashes := make(map[int]int) // expansion socket hash → parent socket hash
+	clusterPassives := make(map[int][]model.ClusterPassive) // parent socket hash → passives
+	for socketHashStr, expansion := range resp.JewelData {
+		socketHash, _ := strconv.Atoi(socketHashStr)
+		for _, node := range expansion.Nodes {
+			if node.IsJewelSocket {
+				expansionSocketHashes[node.Skill] = socketHash
+			}
+			// Determine type
+			ntype := "small"
+			if node.IsNotable {
+				ntype = "notable"
+			} else if node.IsJewelSocket {
+				ntype = "socket"
+			}
+			if len(node.Stats) > 0 || node.IsNotable {
+				clusterPassives[socketHash] = append(clusterPassives[socketHash], model.ClusterPassive{
+					Name:  node.Name,
+					Stats: node.Stats,
+					Type:  ntype,
+				})
+			}
+		}
+	}
+
 	// Parse tree jewels
 	var jewels []model.TreeJewel
 	for _, rawJewel := range resp.Items {
@@ -331,22 +375,46 @@ func (c *Client) GetPassiveTree(ctx context.Context, accountName, characterName 
 		}
 		if err := json.Unmarshal(rawJewel, &j); err == nil {
 			jewels = append(jewels, model.TreeJewel{
-				NodeHash:     j.X,
-				Name:         j.Name,
-				TypeLine:     j.TypeLine,
-				BaseType:     j.BaseType,
-				FrameType:    j.FrameType,
-				IconURL:      j.Icon,
-				ImplicitMods: j.ImplicitMods,
-				ExplicitMods: j.ExplicitMods,
+				NodeHash:        j.X,
+				Name:            j.Name,
+				TypeLine:        j.TypeLine,
+				BaseType:        j.BaseType,
+				FrameType:       j.FrameType,
+				IconURL:         j.Icon,
+				ImplicitMods:    j.ImplicitMods,
+				ExplicitMods:    j.ExplicitMods,
+				ClusterPassives: clusterPassives[j.X],
 			})
+		}
+	}
+
+	// Group sub-jewels (jewels in cluster expansion sockets) under their parent cluster jewel
+	jewelByNode := make(map[int]*model.TreeJewel)
+	for i := range jewels {
+		jewelByNode[jewels[i].NodeHash] = &jewels[i]
+	}
+	// Filter: keep only top-level jewels; attach sub-jewels to their parent
+	var topJewels []model.TreeJewel
+	for i := range jewels {
+		if parentHash, ok := expansionSocketHashes[jewels[i].NodeHash]; ok {
+			if parent := jewelByNode[parentHash]; parent != nil {
+				parent.SubJewels = append(parent.SubJewels, jewels[i])
+				continue
+			}
+		}
+		topJewels = append(topJewels, jewels[i])
+	}
+	// Re-sync SubJewels from pointer map to the topJewels slice
+	for i := range topJewels {
+		if src := jewelByNode[topJewels[i].NodeHash]; src != nil {
+			topJewels[i].SubJewels = src.SubJewels
 		}
 	}
 
 	tree := &model.PassiveTree{
 		Hashes:    allHashes,
 		Masteries: masteries,
-		Jewels:    jewels,
+		Jewels:    topJewels,
 		RawJSON:   string(body),
 	}
 

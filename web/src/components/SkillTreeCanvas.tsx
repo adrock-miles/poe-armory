@@ -820,6 +820,47 @@ function NodeTooltip({
               ))}
             </div>
           )}
+          {/* Cluster jewel expansion passives */}
+          {jewel.clusterPassives && jewel.clusterPassives.length > 0 && (
+            <div className="mt-2 pt-1 border-t border-[#3a3226]">
+              <div className="text-[10px] text-muted-foreground mb-1">Cluster Passives</div>
+              <div className="space-y-0.5">
+                {jewel.clusterPassives.filter(p => p.type !== "socket").map((p, i) => (
+                  <div key={i}>
+                    <span className={`text-[11px] ${p.type === "notable" ? "text-amber-300 font-medium" : "text-gray-300"}`}>
+                      {p.name}
+                    </span>
+                    {p.stats && p.stats.length > 0 && (
+                      <div className="ml-2">
+                        {p.stats.map((s, si) => (
+                          <div key={si} className="text-[10px] text-blue-300">{s}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Sub-jewels socketed in cluster expansion */}
+          {jewel.subJewels && jewel.subJewels.length > 0 && (
+            <div className="mt-2 pt-1 border-t border-[#3a3226]">
+              <div className="text-[10px] text-muted-foreground mb-1">Socketed In Cluster</div>
+              {jewel.subJewels.map((sj, i) => (
+                <div key={i} className="flex items-center gap-1.5 mt-0.5">
+                  {sj.iconUrl && (
+                    <img src={sj.iconUrl} alt={sj.name || sj.typeLine} className="w-5 h-5 object-contain flex-shrink-0" />
+                  )}
+                  <span
+                    className="text-[11px] truncate"
+                    style={{ color: frameTypeToColor(sj.frameType ?? 0) }}
+                  >
+                    {sj.name || sj.typeLine}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
