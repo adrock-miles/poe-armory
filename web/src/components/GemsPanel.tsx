@@ -2,6 +2,7 @@ import type { Gem, Item } from "@/types/character"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { slotDisplayName } from "@/lib/utils"
 
 interface Props {
@@ -40,18 +41,23 @@ export function GemsPanel({ gems, items }: Props) {
           <h3 className="text-sm font-medium text-muted-foreground mb-3">Active Skills</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {activeGems.map((gem) => (
-              <div key={gem.id} className="flex items-center gap-2 p-2 rounded-md bg-secondary/50">
-                {gem.iconUrl && (
-                  <img src={gem.iconUrl} alt={gem.name} className="w-8 h-8 object-contain" loading="lazy" />
-                )}
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-poe-gem truncate">{gem.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    Lv {gem.level}
-                    {gem.quality > 0 && ` / ${gem.quality}%`}
+              <Tooltip key={gem.id}>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-secondary/50 cursor-default">
+                    {gem.iconUrl && (
+                      <img src={gem.iconUrl} alt={gem.name} className="w-8 h-8 object-contain" loading="lazy" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-poe-gem truncate">{gem.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Lv {gem.level}
+                        {gem.quality > 0 && ` / ${gem.quality}%`}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </TooltipTrigger>
+                <GemTooltipContent gem={gem} />
+              </Tooltip>
             ))}
           </div>
         </CardContent>
@@ -112,30 +118,79 @@ export function GemsPanel({ gems, items }: Props) {
 
 function GemRow({ gem }: { gem: Gem }) {
   return (
-    <div className="flex items-center gap-3 py-1">
-      {gem.iconUrl && (
-        <img src={gem.iconUrl} alt={gem.name} className="w-6 h-6 object-contain flex-shrink-0" loading="lazy" />
-      )}
-      <div className="flex-1 min-w-0">
-        <span className={`text-sm ${gem.isSupport ? "text-blue-400" : "text-poe-gem font-medium"}`}>
-          {gem.name}
-        </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex items-center gap-3 py-1 cursor-default">
+          {gem.iconUrl && (
+            <img src={gem.iconUrl} alt={gem.name} className="w-6 h-6 object-contain flex-shrink-0" loading="lazy" />
+          )}
+          <div className="flex-1 min-w-0">
+            <span className={`text-sm ${gem.isSupport ? "text-blue-400" : "text-poe-gem font-medium"}`}>
+              {gem.name}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+              Lv {gem.level}
+            </Badge>
+            {gem.quality > 0 && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                {gem.quality}% Q
+              </Badge>
+            )}
+            {gem.isSupport && (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                Support
+              </Badge>
+            )}
+          </div>
+        </div>
+      </TooltipTrigger>
+      <GemTooltipContent gem={gem} />
+    </Tooltip>
+  )
+}
+
+function GemTooltipContent({ gem }: { gem: Gem }) {
+  return (
+    <TooltipContent side="top" className="max-w-[260px] p-3">
+      <div className="flex items-center gap-2 mb-1.5">
+        {gem.iconUrl && (
+          <img src={gem.iconUrl} alt={gem.name} className="w-8 h-8 object-contain flex-shrink-0" />
+        )}
+        <div>
+          <div className={`font-semibold text-sm ${gem.isSupport ? "text-blue-400" : "text-poe-gem"}`}>
+            {gem.name}
+          </div>
+          <div className="text-[10px] text-muted-foreground">
+            {gem.isSupport ? "Support Gem" : "Skill Gem"}
+          </div>
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-          Lv {gem.level}
-        </Badge>
+      <div className="space-y-0.5 text-xs">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Level</span>
+          <span>{gem.level}</span>
+        </div>
         {gem.quality > 0 && (
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-            {gem.quality}% Q
-          </Badge>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Quality</span>
+            <span className="text-blue-300">+{gem.quality}%</span>
+          </div>
         )}
-        {gem.isSupport && (
-          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-            Support
-          </Badge>
+        {gem.socketGroup !== undefined && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Socket Group</span>
+            <span>{gem.socketGroup + 1}</span>
+          </div>
+        )}
+        {gem.itemSlot && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Slot</span>
+            <span>{slotDisplayName(gem.itemSlot)}</span>
+          </div>
         )}
       </div>
-    </div>
+    </TooltipContent>
   )
 }

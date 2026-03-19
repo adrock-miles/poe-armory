@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatDate } from "@/lib/utils"
-import { Download, Camera, Trash2, Search, Filter, Users, X, CheckSquare, Square } from "lucide-react"
+import { Download, Camera, Trash2, Search, Filter, Users, X, CheckSquare, Square, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 
 export function CharacterListPage() {
   const [characters, setCharacters] = useState<Character[]>([])
@@ -26,6 +27,9 @@ export function CharacterListPage() {
   const [previewSelected, setPreviewSelected] = useState<Set<string>>(new Set())
   const [importing, setImporting] = useState(false)
   const [previewAccount, setPreviewAccount] = useState("")
+
+  // Snapshot loading state
+  const [snapshottingId, setSnapshottingId] = useState<number | null>(null)
 
   // Batch delete state
   const [selectMode, setSelectMode] = useState(false)
@@ -143,11 +147,14 @@ export function CharacterListPage() {
   }
 
   async function handleSnapshot(id: number) {
+    setSnapshottingId(id)
     try {
       await api.snapshotCharacter(id)
-      alert("Snapshot created successfully!")
+      toast.success("Snapshot created successfully!")
     } catch (err: any) {
-      setError(err.message || "Failed to create snapshot")
+      toast.error(err.message || "Failed to create snapshot")
+    } finally {
+      setSnapshottingId(null)
     }
   }
 
@@ -494,9 +501,14 @@ export function CharacterListPage() {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleSnapshot(char.id)}
+                              disabled={snapshottingId === char.id}
                               title="Take Snapshot"
                             >
-                              <Camera className="h-4 w-4" />
+                              {snapshottingId === char.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Camera className="h-4 w-4" />
+                              )}
                             </Button>
                             <Button
                               variant="ghost"
