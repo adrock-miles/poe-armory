@@ -18,9 +18,10 @@ const baseURL = "https://www.pathofexile.com"
 
 // Client communicates with the Path of Exile character-window API.
 type Client struct {
-	httpClient *http.Client
-	sessionID  string
-	userAgent  string
+	httpClient  *http.Client
+	sessionID   string
+	accessToken string
+	userAgent   string
 }
 
 func New(sessionID, userAgent string) *Client {
@@ -52,7 +53,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, params url.
 	}
 
 	req.Header.Set("User-Agent", c.userAgent)
-	if c.sessionID != "" {
+	if c.accessToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.accessToken)
+	} else if c.sessionID != "" {
 		req.AddCookie(&http.Cookie{Name: "POESESSID", Value: c.sessionID})
 	}
 

@@ -31,8 +31,31 @@ func NewSQLiteDB(dbPath string) (*sql.DB, error) {
 
 func RunMigrations(db *sql.DB) error {
 	migrations := []string{
+		// Profiles (authorized PoE accounts)
+		`CREATE TABLE IF NOT EXISTS profiles (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			account_name TEXT NOT NULL UNIQUE,
+			realm TEXT NOT NULL DEFAULT 'pc',
+			access_token TEXT NOT NULL DEFAULT '',
+			refresh_token TEXT NOT NULL DEFAULT '',
+			token_expiry DATETIME,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+
+		// Sessions (browser auth sessions)
+		`CREATE TABLE IF NOT EXISTS sessions (
+			id TEXT PRIMARY KEY,
+			profile_id INTEGER NOT NULL,
+			expires_at DATETIME NOT NULL,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+		)`,
+
+		// Characters (now linked to a profile)
 		`CREATE TABLE IF NOT EXISTS characters (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			profile_id INTEGER,
 			account_name TEXT NOT NULL,
 			name TEXT NOT NULL,
 			league TEXT NOT NULL DEFAULT '',
@@ -43,8 +66,11 @@ func RunMigrations(db *sql.DB) error {
 			experience INTEGER NOT NULL DEFAULT 0,
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			UNIQUE(account_name, name)
+			UNIQUE(account_name, name),
+			FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE SET NULL
 		)`,
+
+		// Snapshots
 		`CREATE TABLE IF NOT EXISTS snapshots (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			character_id INTEGER NOT NULL,
@@ -53,6 +79,8 @@ func RunMigrations(db *sql.DB) error {
 			snapshot_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
 		)`,
+
+		// Items
 		`CREATE TABLE IF NOT EXISTS items (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			snapshot_id INTEGER NOT NULL,
@@ -68,6 +96,8 @@ func RunMigrations(db *sql.DB) error {
 			raw_json TEXT NOT NULL DEFAULT '{}',
 			FOREIGN KEY (snapshot_id) REFERENCES snapshots(id) ON DELETE CASCADE
 		)`,
+
+		// Gems
 		`CREATE TABLE IF NOT EXISTS gems (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			snapshot_id INTEGER NOT NULL,
@@ -82,6 +112,8 @@ func RunMigrations(db *sql.DB) error {
 			raw_json TEXT NOT NULL DEFAULT '{}',
 			FOREIGN KEY (snapshot_id) REFERENCES snapshots(id) ON DELETE CASCADE
 		)`,
+
+		// Passive trees
 		`CREATE TABLE IF NOT EXISTS passive_trees (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			snapshot_id INTEGER NOT NULL UNIQUE,
@@ -92,10 +124,30 @@ func RunMigrations(db *sql.DB) error {
 			raw_json TEXT NOT NULL DEFAULT '{}',
 			FOREIGN KEY (snapshot_id) REFERENCES snapshots(id) ON DELETE CASCADE
 		)`,
+
+		// Public lookups (for shareable character pages)
+		`CREATE TABLE IF NOT EXISTS public_lookups (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			account_name TEXT NOT NULL,
+			character_name TEXT NOT NULL DEFAULT '',
+			share_code TEXT NOT NULL UNIQUE,
+			data_json TEXT NOT NULL DEFAULT '{}',
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			expires_at DATETIME NOT NULL
+		)`,
+
+		// Indexes
+		`CREATE INDEX IF NOT EXISTS idx_profiles_account ON profiles(account_name)`,
+		`CREATE INDEX IF NOT EXISTS idx_sessions_profile ON sessions(profile_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_characters_account ON characters(account_name)`,
+		`CREATE INDEX IF NOT EXISTS idx_characters_profile ON characters(profile_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_characters_league ON characters(league)`,
 		`CREATE INDEX IF NOT EXISTS idx_snapshots_character ON snapshots(character_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_items_snapshot ON items(snapshot_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_gems_snapshot ON gems(snapshot_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_public_lookups_share ON public_lookups(share_code)`,
+		`CREATE INDEX IF NOT EXISTS idx_public_lookups_expires ON public_lookups(expires_at)`,
 	}
 
 	for _, m := range migrations {

@@ -5,6 +5,7 @@ import "time"
 // Character represents the core domain entity for a PoE character.
 type Character struct {
 	ID          int64     `json:"id"`
+	ProfileID   *int64    `json:"profileId,omitempty"`
 	AccountName string    `json:"accountName"`
 	Name        string    `json:"name"`
 	League      string    `json:"league"`
@@ -15,6 +16,13 @@ type Character struct {
 	Experience  int64     `json:"experience"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+// CharacterFilter holds optional filter criteria for listing characters.
+type CharacterFilter struct {
+	AccountName string
+	ProfileID   *int64
+	League      string
 }
 
 // CharacterSnapshot is a versioned point-in-time capture of a character's full state.

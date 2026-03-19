@@ -36,7 +36,8 @@ func NewCharacterService(
 }
 
 // ImportCharacters fetches all characters for an account and upserts them.
-func (s *CharacterService) ImportCharacters(ctx context.Context, accountName string) ([]model.Character, error) {
+// If profileID is provided, characters are linked to that profile.
+func (s *CharacterService) ImportCharacters(ctx context.Context, accountName string, profileID *int64) ([]model.Character, error) {
 	characters, err := s.poeClient.GetCharacters(ctx, accountName)
 	if err != nil {
 		return nil, fmt.Errorf("fetching characters from PoE API: %w", err)
@@ -44,6 +45,25 @@ func (s *CharacterService) ImportCharacters(ctx context.Context, accountName str
 
 	for i := range characters {
 		characters[i].AccountName = accountName
+		characters[i].ProfileID = profileID
+		if err := s.charRepo.Upsert(ctx, &characters[i]); err != nil {
+			return nil, fmt.Errorf("upserting character %s: %w", characters[i].Name, err)
+		}
+	}
+
+	return characters, nil
+}
+
+// ImportCharactersWithClient uses a specific PoE client (e.g. with OAuth token).
+func (s *CharacterService) ImportCharactersWithClient(ctx context.Context, client PoeAPIClient, accountName string, profileID *int64) ([]model.Character, error) {
+	characters, err := client.GetCharacters(ctx, accountName)
+	if err != nil {
+		return nil, fmt.Errorf("fetching characters from PoE API: %w", err)
+	}
+
+	for i := range characters {
+		characters[i].AccountName = accountName
+		characters[i].ProfileID = profileID
 		if err := s.charRepo.Upsert(ctx, &characters[i]); err != nil {
 			return nil, fmt.Errorf("upserting character %s: %w", characters[i].Name, err)
 		}
@@ -86,17 +106,53 @@ func (s *CharacterService) SnapshotCharacter(ctx context.Context, accountName, c
 	return snapshot, nil
 }
 
+// SnapshotCharacterWithClient uses a specific PoE client for the snapshot.
+func (s *CharacterService) SnapshotCharacterWithClient(ctx context.Context, client PoeAPIClient, accountName, characterName string) (*model.CharacterSnapshot, error) {
+	char, err := s.charRepo.GetByAccountAndName(ctx, accountName, characterName)
+	if err != nil {
+		return nil, fmt.Errorf("finding character: %w", err)
+	}
+
+	items, gems, err := client.GetItems(ctx, accountName, characterName)
+	if err != nil {
+		return nil, fmt.Errorf("fetching items: %w", err)
+	}
+
+	tree, err := client.GetPassiveTree(ctx, accountName, characterName)
+	if err != nil {
+		return nil, fmt.Errorf("fetching passive tree: %w", err)
+	}
+
+	snapshot := &model.CharacterSnapshot{
+		CharacterID: char.ID,
+		Level:       char.Level,
+		Experience:  char.Experience,
+		SnapshotAt:  time.Now().UTC(),
+		Items:       items,
+		Gems:        gems,
+		PassiveTree: tree,
+	}
+
+	if err := s.snapshotRepo.Create(ctx, snapshot); err != nil {
+		return nil, fmt.Errorf("saving snapshot: %w", err)
+	}
+
+	return snapshot, nil
+}
+
 // GetCharacter retrieves a character by ID.
 func (s *CharacterService) GetCharacter(ctx context.Context, id int64) (*model.Character, error) {
 	return s.charRepo.GetByID(ctx, id)
 }
 
-// ListCharacters lists all characters for an account, or all if accountName is empty.
-func (s *CharacterService) ListCharacters(ctx context.Context, accountName string) ([]model.Character, error) {
-	if accountName != "" {
-		return s.charRepo.ListByAccount(ctx, accountName)
-	}
-	return s.charRepo.ListAll(ctx)
+// ListCharacters lists characters with optional filters.
+func (s *CharacterService) ListCharacters(ctx context.Context, filter model.CharacterFilter) ([]model.Character, error) {
+	return s.charRepo.ListByFilter(ctx, filter)
+}
+
+// ListLeagues returns all distinct leagues with characters.
+func (s *CharacterService) ListLeagues(ctx context.Context) ([]string, error) {
+	return s.charRepo.ListLeagues(ctx)
 }
 
 // GetSnapshots lists all snapshots for a character.

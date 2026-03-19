@@ -1,11 +1,22 @@
 server:
   port: 8080
   host: "0.0.0.0"
+  base_url: "http://localhost:8080"
 
 database:
   path: "./data/poe-armory.db"
 
 poe:
-  # Set your POESESSID cookie value here or via POE_ARMORY_POE_POESESSID env var
-  poesessid: ""
   user_agent: "PoeArmory/1.0"
+
+oauth:
+  # Register your app by emailing oauth@grindinggear.com
+  # Set via POE_ARMORY_OAUTH_CLIENT_ID and POE_ARMORY_OAUTH_CLIENT_SECRET env vars
+  client_id: ""
+  client_secret: ""
+  redirect_uri: "http://localhost:8080/api/v1/auth/callback"
+
+session:
+  # Change this in production! Set via POE_ARMORY_SESSION_SECRET env var
+  secret: "change-me-in-production"
+  max_age: 36000

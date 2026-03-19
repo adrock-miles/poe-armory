@@ -1,5 +1,17 @@
+export interface Profile {
+  id: number
+  accountName: string
+  realm: string
+}
+
+export interface AuthState {
+  authenticated: boolean
+  profile?: Profile
+}
+
 export interface Character {
   id: number
+  profileId?: number
   accountName: string
   name: string
   league: string
@@ -94,9 +106,15 @@ export interface TreeJewel {
   typeLine: string
 }
 
-export interface AscendancyInfo {
-  className: string
-  ascendancyName: string
-  pointsAllocated: number
-  notables: string[]
+export interface PublicCharacterData {
+  character: Character
+  items: Item[]
+  gems: Gem[]
+  passiveTree: PassiveTree | null
+}
+
+export interface PublicLookupResponse {
+  shareCode: string
+  expiresAt: string
+  data: PublicCharacterData
 }

@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["gcc", "pkg-config"]
+
+[phases.build]
+cmds = [
+  "cd web && npm ci && npm run build && cd ..",
+  "CGO_ENABLED=1 go build -tags sqlite_fts5 -o poe-armory ."
+]
+
+[start]
+cmd = "./poe-armory serve"

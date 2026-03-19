@@ -1,32 +1,56 @@
 import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import { api } from "@/lib/api"
-import type { Character } from "@/types/character"
+import { useAuth } from "@/hooks/useAuth"
+import type { Character, Profile } from "@/types/character"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatDate } from "@/lib/utils"
-import { Download, Camera, Trash2, Search } from "lucide-react"
+import { Download, Camera, Trash2, Search, Filter, Users } from "lucide-react"
 
 export function CharacterListPage() {
+  const { auth } = useAuth()
   const [characters, setCharacters] = useState<Character[]>([])
-  const [accountName, setAccountName] = useState("")
+  const [leagues, setLeagues] = useState<string[]>([])
+  const [profiles, setProfiles] = useState<Profile[]>([])
+  const [selectedLeague, setSelectedLeague] = useState("")
+  const [selectedProfile, setSelectedProfile] = useState<number | undefined>()
   const [loading, setLoading] = useState(false)
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
+    loadFilters()
     loadCharacters()
   }, [])
+
+  useEffect(() => {
+    loadCharacters()
+  }, [selectedLeague, selectedProfile])
+
+  async function loadFilters() {
+    try {
+      const [l, p] = await Promise.all([
+        api.listLeagues().catch(() => []),
+        api.listProfiles().catch(() => []),
+      ])
+      setLeagues(Array.isArray(l) ? l : [])
+      setProfiles(Array.isArray(p) ? p : [])
+    } catch {
+      // ignore
+    }
+  }
 
   async function loadCharacters() {
     setLoading(true)
     try {
-      const chars = await api.listCharacters()
+      const chars = await api.listCharacters({
+        league: selectedLeague || undefined,
+        profileId: selectedProfile,
+      })
       setCharacters(Array.isArray(chars) ? chars : [])
     } catch {
-      // No characters yet
       setCharacters([])
     } finally {
       setLoading(false)
@@ -34,13 +58,11 @@ export function CharacterListPage() {
   }
 
   async function handleImport() {
-    if (!accountName.trim()) return
     setImporting(true)
     setError("")
     try {
-      await api.importCharacters(accountName.trim())
-      await loadCharacters()
-      setAccountName("")
+      await api.importCharacters()
+      await Promise.all([loadCharacters(), loadFilters()])
     } catch (err: any) {
       setError(err.message || "Failed to import characters")
     } finally {
@@ -67,6 +89,21 @@ export function CharacterListPage() {
     }
   }
 
+  // Group characters by league
+  const charsByLeague = characters.reduce<Record<string, Character[]>>((acc, char) => {
+    const league = char.league || "Standard"
+    if (!acc[league]) acc[league] = []
+    acc[league].push(char)
+    return acc
+  }, {})
+
+  // Sort leagues: current leagues first, then Standard
+  const leagueOrder = Object.keys(charsByLeague).sort((a, b) => {
+    if (a === "Standard") return 1
+    if (b === "Standard") return -1
+    return a.localeCompare(b)
+  })
+
   const classColors: Record<string, string> = {
     Marauder: "bg-red-900/50 text-red-300",
     Witch: "bg-purple-900/50 text-purple-300",
@@ -82,35 +119,87 @@ export function CharacterListPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Characters</h1>
         <p className="text-muted-foreground">
-          Import and track your Path of Exile characters over time.
+          Track your Path of Exile characters organized by league.
         </p>
       </div>
 
-      {/* Import Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Import Characters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-3">
-            <Input
-              placeholder="PoE Account Name"
-              value={accountName}
-              onChange={(e) => setAccountName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleImport()}
-              className="max-w-sm"
-            />
-            <Button onClick={handleImport} disabled={importing || !accountName.trim()}>
-              <Download className="mr-2 h-4 w-4" />
-              {importing ? "Importing..." : "Import"}
+      {/* Actions Bar */}
+      {auth.authenticated && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Button onClick={handleImport} disabled={importing}>
+                <Download className="mr-2 h-4 w-4" />
+                {importing ? "Syncing..." : "Sync My Characters"}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Imports all characters from your authorized PoE account.
+              </span>
+            </div>
+            {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+          </CardContent>
+        </Card>
+      )}
+
+      {!auth.authenticated && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">
+              <a href="/api/v1/auth/login" className="text-primary hover:underline font-medium">
+                Login with your PoE account
+              </a>{" "}
+              to import and track your characters. Or use the{" "}
+              <Link to="/lookup" className="text-primary hover:underline font-medium">
+                Public Lookup
+              </Link>{" "}
+              to view any public profile.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Filters */}
+      {(leagues.length > 0 || profiles.length > 0) && (
+        <div className="flex flex-wrap gap-3 items-center">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+
+          {/* League filter */}
+          <select
+            value={selectedLeague}
+            onChange={(e) => setSelectedLeague(e.target.value)}
+            className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+          >
+            <option value="">All Leagues</option>
+            {leagues.map((l) => (
+              <option key={l} value={l}>{l}</option>
+            ))}
+          </select>
+
+          {/* Profile filter */}
+          {profiles.length > 1 && (
+            <select
+              value={selectedProfile ?? ""}
+              onChange={(e) => setSelectedProfile(e.target.value ? Number(e.target.value) : undefined)}
+              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+            >
+              <option value="">All Profiles</option>
+              {profiles.map((p) => (
+                <option key={p.id} value={p.id}>{p.accountName}</option>
+              ))}
+            </select>
+          )}
+
+          {(selectedLeague || selectedProfile) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setSelectedLeague(""); setSelectedProfile(undefined) }}
+            >
+              Clear Filters
             </Button>
-          </div>
-          {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
-          <p className="mt-2 text-xs text-muted-foreground">
-            The account profile must be set to public, or configure your POESESSID in settings.
-          </p>
-        </CardContent>
-      </Card>
+          )}
+        </div>
+      )}
 
       {/* Character List */}
       {loading ? (
@@ -119,64 +208,80 @@ export function CharacterListPage() {
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <Search className="mx-auto h-12 w-12 mb-4 opacity-50" />
-            <p>No characters imported yet.</p>
-            <p className="text-sm">Enter a PoE account name above to get started.</p>
+            <p>No characters found.</p>
+            {auth.authenticated ? (
+              <p className="text-sm">Click "Sync My Characters" to import from your PoE account.</p>
+            ) : (
+              <p className="text-sm">Login with PoE to import your characters.</p>
+            )}
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-3">
-          {/* Table Header */}
-          <div className="grid grid-cols-[1fr_120px_100px_140px_120px_100px] gap-4 px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            <div>Character</div>
-            <div>Class</div>
-            <div>Level</div>
-            <div>League</div>
-            <div>Updated</div>
-            <div className="text-right">Actions</div>
-          </div>
+        <div className="space-y-8">
+          {leagueOrder.map((league) => (
+            <div key={league}>
+              {/* League Header */}
+              <div className="flex items-center gap-2 mb-3">
+                <h2 className="text-lg font-semibold">{league}</h2>
+                <Badge variant="secondary" className="text-xs">
+                  {charsByLeague[league].length} character{charsByLeague[league].length !== 1 ? "s" : ""}
+                </Badge>
+              </div>
 
-          {characters.map((char) => (
-            <Card key={char.id} className="hover:bg-accent/50 transition-colors">
-              <CardContent className="p-4">
-                <div className="grid grid-cols-[1fr_120px_100px_140px_120px_100px] gap-4 items-center">
-                  <div>
-                    <Link
-                      to={`/characters/${char.id}`}
-                      className="font-medium hover:text-primary transition-colors"
-                    >
-                      {char.name}
-                    </Link>
-                    <div className="text-xs text-muted-foreground">{char.accountName}</div>
-                  </div>
-                  <div>
-                    <Badge variant="outline" className={classColors[char.class] || ""}>
-                      {char.ascendancy || char.class}
-                    </Badge>
-                  </div>
-                  <div className="font-mono text-sm">{char.level}</div>
-                  <div className="text-sm text-muted-foreground">{char.league || "Standard"}</div>
-                  <div className="text-xs text-muted-foreground">{formatDate(char.updatedAt)}</div>
-                  <div className="flex gap-1 justify-end">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleSnapshot(char.id)}
-                      title="Take Snapshot"
-                    >
-                      <Camera className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(char.id)}
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              {/* Characters in this league */}
+              <div className="grid gap-2">
+                {charsByLeague[league].map((char) => (
+                  <Card key={char.id} className="hover:bg-accent/50 transition-colors">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                          <div className="min-w-0">
+                            <Link
+                              to={`/characters/${char.id}`}
+                              className="font-medium hover:text-primary transition-colors"
+                            >
+                              {char.name}
+                            </Link>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <Users className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">{char.accountName}</span>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className={classColors[char.class] || ""}>
+                            {char.ascendancy || char.class}
+                          </Badge>
+                          <span className="font-mono text-sm">Lv {char.level}</span>
+                          <span className="text-xs text-muted-foreground hidden md:inline">
+                            Updated {formatDate(char.updatedAt)}
+                          </span>
+                        </div>
+
+                        {auth.authenticated && (
+                          <div className="flex gap-1 ml-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleSnapshot(char.id)}
+                              title="Take Snapshot"
+                            >
+                              <Camera className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(char.id)}
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
