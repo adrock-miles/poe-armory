@@ -3,7 +3,7 @@ import { Shield } from "lucide-react"
 
 export function Layout() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
           <Link to="/" className="flex items-center space-x-2">
@@ -15,9 +15,14 @@ export function Layout() {
           </div>
         </div>
       </header>
-      <main className="container py-6">
+      <main className="container py-6 pb-12 flex-1">
         <Outlet />
       </main>
+      <footer className="border-t py-6 text-center text-xs text-muted-foreground">
+        <div className="container">
+          PoE Armory — Path of Exile Character Tracker. Not affiliated with Grinding Gear Games.
+        </div>
+      </footer>
     </div>
   )
 }
