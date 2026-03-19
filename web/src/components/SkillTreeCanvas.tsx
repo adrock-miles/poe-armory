@@ -27,13 +27,13 @@ interface Props {
 }
 
 const NODE_RADIUS: Record<string, number> = {
-  n: 5,
-  N: 8,
-  K: 12,
-  M: 7,
-  J: 7,
-  S: 14,
-  A: 6,
+  n: 3,
+  N: 5,
+  K: 8,
+  M: 5,
+  J: 5,
+  S: 10,
+  A: 4,
 }
 
 const NODE_COLORS: Record<string, Record<string, string>> = {
