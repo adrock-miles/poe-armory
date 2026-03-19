@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import type { Gem, Item } from "@/types/character"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -10,18 +10,81 @@ interface Props {
 }
 
 // Paper-doll slot positions — mirrors the in-game character equipment layout
-// Grid: 7 columns x 6 rows on desktop
-const SLOT_POSITIONS: Record<string, { col: string; row: string; label: string }> = {
-  Weapon:     { col: "1 / 3", row: "1 / 4", label: "Main Hand" },
-  Offhand:    { col: "6 / 8", row: "1 / 4", label: "Off Hand" },
-  Helm:       { col: "3 / 6", row: "1 / 2", label: "Helmet" },
-  BodyArmour: { col: "3 / 6", row: "2 / 4", label: "Body Armour" },
-  Amulet:     { col: "6 / 7", row: "1 / 2", label: "Amulet" },
-  Gloves:     { col: "1 / 3", row: "4 / 5", label: "Gloves" },
-  Boots:      { col: "6 / 8", row: "4 / 5", label: "Boots" },
-  Ring:       { col: "3 / 4", row: "4 / 5", label: "Left Ring" },
-  Ring2:      { col: "5 / 6", row: "4 / 5", label: "Right Ring" },
-  Belt:       { col: "4 / 5", row: "4 / 5", label: "Belt" },
+// Grid: 7 columns x 5 rows on desktop
+const SLOT_POSITIONS: Record<
+  string,
+  { col: string; row: string; label: string; iconClass: string; minH: string }
+> = {
+  Weapon: {
+    col: "1 / 3",
+    row: "1 / 4",
+    label: "Main Hand",
+    iconClass: "w-14 h-20 md:w-16 md:h-24",
+    minH: "min-h-[120px] md:min-h-[150px]",
+  },
+  Offhand: {
+    col: "6 / 8",
+    row: "1 / 4",
+    label: "Off Hand",
+    iconClass: "w-14 h-20 md:w-16 md:h-24",
+    minH: "min-h-[120px] md:min-h-[150px]",
+  },
+  Helm: {
+    col: "3 / 6",
+    row: "1 / 2",
+    label: "Helmet",
+    iconClass: "w-10 h-10 md:w-12 md:h-12",
+    minH: "min-h-[70px]",
+  },
+  BodyArmour: {
+    col: "3 / 6",
+    row: "2 / 4",
+    label: "Body Armour",
+    iconClass: "w-12 h-16 md:w-14 md:h-20",
+    minH: "min-h-[100px] md:min-h-[120px]",
+  },
+  Amulet: {
+    col: "6 / 7",
+    row: "1 / 2",
+    label: "Amulet",
+    iconClass: "w-7 h-7 md:w-8 md:h-8",
+    minH: "min-h-[60px]",
+  },
+  Gloves: {
+    col: "1 / 3",
+    row: "4 / 5",
+    label: "Gloves",
+    iconClass: "w-10 h-10 md:w-12 md:h-12",
+    minH: "min-h-[70px]",
+  },
+  Boots: {
+    col: "6 / 8",
+    row: "4 / 5",
+    label: "Boots",
+    iconClass: "w-10 h-10 md:w-12 md:h-12",
+    minH: "min-h-[70px]",
+  },
+  Ring: {
+    col: "3 / 4",
+    row: "4 / 5",
+    label: "Left Ring",
+    iconClass: "w-7 h-7 md:w-8 md:h-8",
+    minH: "min-h-[60px]",
+  },
+  Ring2: {
+    col: "5 / 6",
+    row: "4 / 5",
+    label: "Right Ring",
+    iconClass: "w-7 h-7 md:w-8 md:h-8",
+    minH: "min-h-[60px]",
+  },
+  Belt: {
+    col: "4 / 5",
+    row: "4 / 5",
+    label: "Belt",
+    iconClass: "w-10 h-6 md:w-12 md:h-7",
+    minH: "min-h-[60px]",
+  },
 }
 
 const SOCKET_COLORS: Record<string, string> = {
@@ -34,7 +97,9 @@ const SOCKET_COLORS: Record<string, string> = {
 }
 
 export function GearPanel({ items, gems }: Props) {
+  // Single popover ID — either item.id or gem.id + 100000
   const [activePopover, setActivePopover] = useState<number | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   // Group gems by item slot
   const gemsBySlot = gems.reduce<Record<string, Gem[]>>((acc, gem) => {
@@ -52,7 +117,25 @@ export function GearPanel({ items, gems }: Props) {
 
   const flasks = items.filter((i) => i.slot.startsWith("Flask"))
 
-  const dismiss = useCallback(() => setActivePopover(null), [])
+  // Close popover when clicking outside any slot
+  useEffect(() => {
+    if (activePopover === null) return
+    function handleClick(e: MouseEvent) {
+      const target = e.target as HTMLElement
+      // If the click is inside a [data-slot] element, that slot's own
+      // onClick already handles the toggle — don't interfere.
+      if (target.closest("[data-slot]")) return
+      setActivePopover(null)
+    }
+    document.addEventListener("pointerdown", handleClick)
+    return () => document.removeEventListener("pointerdown", handleClick)
+  }, [activePopover])
+
+  // Toggle helper: clicking a new slot opens it, clicking the same closes it
+  const toggle = useCallback(
+    (id: number) => setActivePopover((prev) => (prev === id ? null : id)),
+    [],
+  )
 
   if (items.length === 0) {
     return (
@@ -65,15 +148,12 @@ export function GearPanel({ items, gems }: Props) {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Paper-doll grid */}
-      <div
-        className="grid gap-2 mx-auto max-w-[700px]"
-        style={{
-          gridTemplateColumns: "repeat(7, 1fr)",
-          gridTemplateRows: "repeat(4, auto)",
-        }}
-      >
+    <div className="space-y-4" ref={containerRef}>
+      {/* Paper-doll grid — stacks to 2-column on mobile */}
+      <div className="hidden md:grid gap-2 mx-auto max-w-[700px]" style={{
+        gridTemplateColumns: "repeat(7, 1fr)",
+        gridTemplateRows: "repeat(4, auto)",
+      }}>
         {Object.entries(SLOT_POSITIONS).map(([slot, pos]) => {
           const item = itemsBySlot[slot]
           const slotGems = gemsBySlot[slot] || []
@@ -86,9 +166,65 @@ export function GearPanel({ items, gems }: Props) {
               gems={slotGems}
               col={pos.col}
               row={pos.row}
+              iconClass={pos.iconClass}
+              minH={pos.minH}
               activePopover={activePopover}
-              setActivePopover={setActivePopover}
+              toggle={toggle}
             />
+          )
+        })}
+      </div>
+
+      {/* Mobile layout — simple 2-col grid that mirrors the paper-doll rows */}
+      <div className="grid md:hidden grid-cols-2 gap-2">
+        {/* Row 1: Weapon + Helm */}
+        {(["Weapon", "Helm"] as const).map((slot) => {
+          const pos = SLOT_POSITIONS[slot]
+          const item = itemsBySlot[slot]
+          const slotGems = gemsBySlot[slot] || []
+          return (
+            <EquipmentSlot key={slot} slot={slot} label={pos.label} item={item} gems={slotGems}
+              iconClass={pos.iconClass} minH={pos.minH} activePopover={activePopover} toggle={toggle} />
+          )
+        })}
+        {/* Row 2: Amulet + Body Armour */}
+        {(["Amulet", "BodyArmour"] as const).map((slot) => {
+          const pos = SLOT_POSITIONS[slot]
+          const item = itemsBySlot[slot]
+          const slotGems = gemsBySlot[slot] || []
+          return (
+            <EquipmentSlot key={slot} slot={slot} label={pos.label} item={item} gems={slotGems}
+              iconClass={pos.iconClass} minH={pos.minH} activePopover={activePopover} toggle={toggle} />
+          )
+        })}
+        {/* Row 3: Offhand + Belt */}
+        {(["Offhand", "Belt"] as const).map((slot) => {
+          const pos = SLOT_POSITIONS[slot]
+          const item = itemsBySlot[slot]
+          const slotGems = gemsBySlot[slot] || []
+          return (
+            <EquipmentSlot key={slot} slot={slot} label={pos.label} item={item} gems={slotGems}
+              iconClass={pos.iconClass} minH={pos.minH} activePopover={activePopover} toggle={toggle} />
+          )
+        })}
+        {/* Row 4: Left Ring + Right Ring */}
+        {(["Ring", "Ring2"] as const).map((slot) => {
+          const pos = SLOT_POSITIONS[slot]
+          const item = itemsBySlot[slot]
+          const slotGems = gemsBySlot[slot] || []
+          return (
+            <EquipmentSlot key={slot} slot={slot} label={pos.label} item={item} gems={slotGems}
+              iconClass={pos.iconClass} minH={pos.minH} activePopover={activePopover} toggle={toggle} />
+          )
+        })}
+        {/* Row 5: Gloves + Boots */}
+        {(["Gloves", "Boots"] as const).map((slot) => {
+          const pos = SLOT_POSITIONS[slot]
+          const item = itemsBySlot[slot]
+          const slotGems = gemsBySlot[slot] || []
+          return (
+            <EquipmentSlot key={slot} slot={slot} label={pos.label} item={item} gems={slotGems}
+              iconClass={pos.iconClass} minH={pos.minH} activePopover={activePopover} toggle={toggle} />
           )
         })}
       </div>
@@ -103,16 +239,11 @@ export function GearPanel({ items, gems }: Props) {
                 key={item.id}
                 item={item}
                 activePopover={activePopover}
-                setActivePopover={setActivePopover}
+                toggle={toggle}
               />
             ))}
           </div>
         </div>
-      )}
-
-      {/* Click-away overlay for mobile */}
-      {activePopover !== null && (
-        <div className="fixed inset-0 z-40" onClick={dismiss} />
       )}
     </div>
   )
@@ -125,17 +256,21 @@ function EquipmentSlot({
   gems,
   col,
   row,
+  iconClass,
+  minH,
   activePopover,
-  setActivePopover,
+  toggle,
 }: {
   slot: string
   label: string
   item?: Item
   gems: Gem[]
-  col: string
-  row: string
+  col?: string
+  row?: string
+  iconClass: string
+  minH: string
   activePopover: number | null
-  setActivePopover: (id: number | null) => void
+  toggle: (id: number) => void
 }) {
   const borderColor = item ? frameTypeToColor(item.frameType) : "#2a2520"
 
@@ -147,22 +282,18 @@ function EquipmentSlot({
     return acc
   }, {})
 
-  const handleTap = useCallback(() => {
-    if (!item) return
-    setActivePopover(activePopover === item.id ? null : item.id)
-  }, [item, activePopover, setActivePopover])
-
   const isActive = item && activePopover === item.id
 
   return (
     <div
       className="relative group"
-      style={{ gridColumn: col, gridRow: row }}
+      data-slot={slot}
+      style={col && row ? { gridColumn: col, gridRow: row } : undefined}
     >
       <div
-        className="relative flex flex-col items-center justify-center rounded-lg border bg-[#1a1612] p-1.5 h-full min-h-[80px] cursor-pointer transition-colors hover:bg-[#252018]"
+        className={`relative flex flex-col items-center justify-center rounded-lg border bg-[#1a1612] p-1.5 h-full ${minH} cursor-pointer transition-colors hover:bg-[#252018]`}
         style={{ borderColor, borderWidth: item ? "2px" : "1px" }}
-        onClick={handleTap}
+        onClick={() => item && toggle(item.id)}
       >
         {/* Slot label */}
         <div className="text-[9px] uppercase tracking-wider text-muted-foreground/60 mb-0.5 text-center leading-tight">
@@ -171,12 +302,12 @@ function EquipmentSlot({
 
         {item ? (
           <>
-            {/* Item icon */}
+            {/* Item icon — sized per slot */}
             {item.iconUrl && (
               <img
                 src={item.iconUrl}
                 alt={item.typeLine}
-                className="w-12 h-12 md:w-14 md:h-14 object-contain"
+                className={`${iconClass} object-contain`}
                 loading="lazy"
               />
             )}
@@ -193,7 +324,12 @@ function EquipmentSlot({
             {gems.length > 0 && (
               <div className="flex flex-wrap gap-0.5 mt-1 justify-center">
                 {Object.entries(gemGroups).map(([groupIdx, groupGems]) => (
-                  <GemLinkGroup key={groupIdx} gems={groupGems} activePopover={activePopover} setActivePopover={setActivePopover} />
+                  <GemLinkGroup
+                    key={groupIdx}
+                    gems={groupGems}
+                    activePopover={activePopover}
+                    toggle={toggle}
+                  />
                 ))}
               </div>
             )}
@@ -214,48 +350,49 @@ function EquipmentSlot({
 function GemLinkGroup({
   gems,
   activePopover,
-  setActivePopover,
+  toggle,
 }: {
   gems: Gem[]
   activePopover: number | null
-  setActivePopover: (id: number | null) => void
+  toggle: (id: number) => void
 }) {
   return (
     <div className="flex items-center">
-      {gems.map((gem, i) => (
-        <div key={gem.id} className="flex items-center">
-          {i > 0 && (
-            <div className="w-1 h-[2px] bg-amber-600/60" />
-          )}
-          <div className="relative group/gem">
-            <div
-              className={`w-4 h-4 rounded-full border flex items-center justify-center cursor-pointer transition-transform hover:scale-125 ${
-                gem.isSupport
-                  ? "border-blue-400/60 bg-blue-900/50"
-                  : "border-amber-400/60 bg-amber-900/50"
-              }`}
-              onClick={(e) => {
-                e.stopPropagation()
-                setActivePopover(activePopover === gem.id + 100000 ? null : gem.id + 100000)
-              }}
-            >
-              {gem.iconUrl && (
-                <img src={gem.iconUrl} alt={gem.name} className="w-3 h-3 object-contain" />
-              )}
-            </div>
-            {/* Desktop hover tooltip */}
-            <div className="hidden group-hover/gem:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 pointer-events-none">
-              <GemTooltipInner gem={gem} />
-            </div>
-            {/* Mobile tap popover */}
-            {activePopover === gem.id + 100000 && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50">
+      {gems.map((gem, i) => {
+        const gemPopoverId = gem.id + 100000
+        return (
+          <div key={gem.id} className="flex items-center">
+            {i > 0 && <div className="w-1 h-[2px] bg-amber-600/60" />}
+            <div className="relative group/gem" data-slot="gem">
+              <div
+                className={`w-4 h-4 rounded-full border flex items-center justify-center cursor-pointer transition-transform hover:scale-125 ${
+                  gem.isSupport
+                    ? "border-blue-400/60 bg-blue-900/50"
+                    : "border-amber-400/60 bg-amber-900/50"
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggle(gemPopoverId)
+                }}
+              >
+                {gem.iconUrl && (
+                  <img src={gem.iconUrl} alt={gem.name} className="w-3 h-3 object-contain" />
+                )}
+              </div>
+              {/* Desktop hover tooltip */}
+              <div className="hidden group-hover/gem:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 pointer-events-none">
                 <GemTooltipInner gem={gem} />
               </div>
-            )}
+              {/* Mobile tap popover */}
+              {activePopover === gemPopoverId && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50">
+                  <GemTooltipInner gem={gem} />
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -263,24 +400,24 @@ function GemLinkGroup({
 function FlaskSlot({
   item,
   activePopover,
-  setActivePopover,
+  toggle,
 }: {
   item: Item
   activePopover: number | null
-  setActivePopover: (id: number | null) => void
+  toggle: (id: number) => void
 }) {
   const borderColor = frameTypeToColor(item.frameType)
   const isActive = activePopover === item.id
 
   return (
-    <div className="relative">
+    <div className="relative" data-slot="flask">
       <div
-        className="flex flex-col items-center rounded-lg border bg-[#1a1612] p-1.5 w-[72px] cursor-pointer transition-colors hover:bg-[#252018]"
+        className="flex flex-col items-center rounded-lg border bg-[#1a1612] p-1.5 w-[60px] md:w-[72px] cursor-pointer transition-colors hover:bg-[#252018]"
         style={{ borderColor, borderWidth: "2px" }}
-        onClick={() => setActivePopover(isActive ? null : item.id)}
+        onClick={() => toggle(item.id)}
       >
         {item.iconUrl && (
-          <img src={item.iconUrl} alt={item.typeLine} className="w-10 h-10 object-contain" loading="lazy" />
+          <img src={item.iconUrl} alt={item.typeLine} className="w-8 h-12 md:w-10 md:h-14 object-contain" loading="lazy" />
         )}
         <div className="text-[9px] text-center truncate w-full mt-0.5" style={{ color: borderColor }}>
           {item.name || item.typeLine}
@@ -301,9 +438,29 @@ function ItemPopover({
   gemGroups: Record<number, Gem[]>
 }) {
   const borderColor = frameTypeToColor(item.frameType)
+  const popoverRef = useRef<HTMLDivElement>(null)
+
+  // Reposition if popover overflows viewport
+  useEffect(() => {
+    const el = popoverRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    if (rect.right > window.innerWidth) {
+      el.style.left = "auto"
+      el.style.right = "0"
+      el.style.transform = "none"
+    }
+    if (rect.left < 0) {
+      el.style.left = "0"
+      el.style.transform = "none"
+    }
+  }, [])
 
   return (
-    <div className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-1 w-[280px] bg-[#1a1612] border border-[#3a3226] rounded-lg shadow-2xl p-3 text-left">
+    <div
+      ref={popoverRef}
+      className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-1 w-[280px] bg-[#1a1612] border border-[#3a3226] rounded-lg shadow-2xl p-3 text-left"
+    >
       {/* Item header */}
       <div className="flex items-start gap-2 mb-2">
         {item.iconUrl && (
@@ -392,7 +549,7 @@ function ItemPopover({
 
 function GemTooltipInner({ gem }: { gem: Gem }) {
   return (
-    <div className="bg-[#1a1612] border border-[#3a3226] rounded-lg shadow-xl p-2 w-[200px] text-left">
+    <div className="bg-[#1a1612] border border-[#3a3226] rounded-lg shadow-xl p-2 w-[200px] text-left whitespace-nowrap">
       <div className="flex items-center gap-1.5 mb-1">
         {gem.iconUrl && (
           <img src={gem.iconUrl} alt={gem.name} className="w-5 h-5 object-contain flex-shrink-0" />
