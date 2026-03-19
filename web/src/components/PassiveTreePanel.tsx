@@ -129,6 +129,59 @@ export function PassiveTreePanel({ tree }: Props) {
                         ))}
                       </div>
                     )}
+                    {/* Cluster expansion passives */}
+                    {j.clusterPassives && j.clusterPassives.length > 0 && (
+                      <div className="mt-2 pt-1 border-t border-border/50">
+                        <div className="text-[10px] text-muted-foreground mb-1">Cluster Passives</div>
+                        <div className="space-y-1">
+                          {j.clusterPassives.filter(p => p.type !== "socket").map((p, pi) => (
+                            <div key={pi}>
+                              <span className={`text-xs ${p.type === "notable" ? "text-amber-300 font-medium" : "text-gray-300"}`}>
+                                {p.name}
+                              </span>
+                              {p.stats && p.stats.length > 0 && (
+                                <div className="ml-2">
+                                  {p.stats.map((s, si) => (
+                                    <div key={si} className="text-[11px] text-blue-300">{s}</div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* Sub-jewels socketed in this cluster jewel */}
+                    {j.subJewels && j.subJewels.length > 0 && (
+                      <div className="mt-2 pt-1 border-t border-border/50">
+                        <div className="text-[10px] text-muted-foreground mb-1">Socketed Jewels</div>
+                        {j.subJewels.map((sj, si) => (
+                          <div key={si} className="flex items-start gap-2 mt-1">
+                            {sj.iconUrl && (
+                              <img src={sj.iconUrl} alt={sj.name || sj.typeLine} className="w-8 h-8 object-contain flex-shrink-0" />
+                            )}
+                            <div className="min-w-0">
+                              {sj.name && (
+                                <div
+                                  className="text-xs font-medium truncate"
+                                  style={{ color: frameTypeToColor(sj.frameType ?? 0) }}
+                                >
+                                  {sj.name}
+                                </div>
+                              )}
+                              <div className="text-[11px] text-muted-foreground">{sj.typeLine}</div>
+                              {sj.explicitMods && sj.explicitMods.length > 0 && (
+                                <div className="mt-0.5 space-y-0.5">
+                                  {sj.explicitMods.map((mod, mi) => (
+                                    <div key={mi} className="text-[11px] text-blue-300">{mod}</div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <Badge variant="outline" className="text-[10px] flex-shrink-0">
                     Node {j.nodeHash}
