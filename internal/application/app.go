@@ -36,34 +36,20 @@ func New(cfg *config.Config) (*App, error) {
 	// Repositories
 	charRepo := database.NewCharacterRepo(db)
 	snapshotRepo := database.NewSnapshotRepo(db)
-	profileRepo := database.NewProfileRepo(db)
-	sessionRepo := database.NewSessionRepo(db)
-	lookupRepo := database.NewPublicLookupRepo(db)
 
-	// PoE clients
-	poeClient := poe_client.New("", cfg.PoE.UserAgent) // public API client
-	oauthClient := poe_client.NewOAuthClient(
-		cfg.OAuth.ClientID,
-		cfg.OAuth.ClientSecret,
-		cfg.OAuth.RedirectURI,
-		cfg.PoE.UserAgent,
-	)
+	// PoE public API client (no auth needed)
+	poeClient := poe_client.New(cfg.PoE.UserAgent, poe_client.RealmPC)
 
 	// Services
 	charService := service.NewCharacterService(charRepo, snapshotRepo, poeClient)
-	authService := service.NewAuthService(profileRepo, sessionRepo, cfg.Session.MaxAge)
-	publicService := service.NewPublicService(lookupRepo, poeClient)
 
 	// Router
 	router := mux.NewRouter()
 	router.Use(middleware.Logging)
 	router.Use(middleware.JSON)
-	router.Use(middleware.Auth(authService))
 
 	// Handlers
-	charHandler := handler.NewCharacterHandler(charService)
-	authHandler := handler.NewAuthHandler(authService, charService, oauthClient, cfg)
-	publicHandler := handler.NewPublicHandler(publicService)
+	h := handler.NewCharacterHandler(charService)
 
 	api := router.PathPrefix("/api/v1").Subrouter()
 
@@ -73,29 +59,19 @@ func New(cfg *config.Config) (*App, error) {
 		w.Write([]byte(`{"status":"ok"}`))
 	}).Methods("GET")
 
-	// Auth routes
-	api.HandleFunc("/auth/login", authHandler.Login).Methods("GET")
-	api.HandleFunc("/auth/callback", authHandler.Callback).Methods("GET")
-	api.HandleFunc("/auth/logout", authHandler.Logout).Methods("POST")
-	api.HandleFunc("/auth/me", authHandler.Me).Methods("GET")
-	api.HandleFunc("/auth/profiles", authHandler.ListProfiles).Methods("GET")
+	// Character routes
+	api.HandleFunc("/characters", h.ListCharacters).Methods("GET")
+	api.HandleFunc("/characters/import", h.ImportCharacters).Methods("POST")
+	api.HandleFunc("/characters/leagues", h.ListLeagues).Methods("GET")
+	api.HandleFunc("/characters/accounts", h.ListAccounts).Methods("GET")
+	api.HandleFunc("/characters/{id:[0-9]+}", h.GetCharacter).Methods("GET")
+	api.HandleFunc("/characters/{id:[0-9]+}", h.DeleteCharacter).Methods("DELETE")
+	api.HandleFunc("/characters/{id:[0-9]+}/snapshot", h.SnapshotCharacter).Methods("POST")
+	api.HandleFunc("/characters/{id:[0-9]+}/snapshots", h.ListSnapshots).Methods("GET")
+	api.HandleFunc("/characters/{id:[0-9]+}/snapshots/latest", h.GetLatestSnapshot).Methods("GET")
+	api.HandleFunc("/snapshots/{id:[0-9]+}", h.GetSnapshot).Methods("GET")
 
-	// Character routes (read endpoints are public, write endpoints require auth)
-	api.HandleFunc("/characters", charHandler.ListCharacters).Methods("GET")
-	api.HandleFunc("/characters/import", middleware.RequireAuth(charHandler.ImportCharacters)).Methods("POST")
-	api.HandleFunc("/characters/leagues", charHandler.ListLeagues).Methods("GET")
-	api.HandleFunc("/characters/{id:[0-9]+}", charHandler.GetCharacter).Methods("GET")
-	api.HandleFunc("/characters/{id:[0-9]+}", middleware.RequireAuth(charHandler.DeleteCharacter)).Methods("DELETE")
-	api.HandleFunc("/characters/{id:[0-9]+}/snapshot", middleware.RequireAuth(charHandler.SnapshotCharacter)).Methods("POST")
-	api.HandleFunc("/characters/{id:[0-9]+}/snapshots", charHandler.ListSnapshots).Methods("GET")
-	api.HandleFunc("/characters/{id:[0-9]+}/snapshots/latest", charHandler.GetLatestSnapshot).Methods("GET")
-	api.HandleFunc("/snapshots/{id:[0-9]+}", charHandler.GetSnapshot).Methods("GET")
-
-	// Public lookup routes (no auth required)
-	api.HandleFunc("/public/lookup", publicHandler.LookupCharacter).Methods("POST")
-	api.HandleFunc("/public/share/{code}", publicHandler.GetSharedCharacter).Methods("GET")
-
-	// Serve static frontend files (SPA fallback)
+	// Serve frontend (SPA with fallback to index.html)
 	spa := spaHandler{staticPath: "./web/dist", indexPath: "index.html"}
 	router.PathPrefix("/").Handler(spa)
 
@@ -113,7 +89,7 @@ func (a *App) Run() error {
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:3000", a.Config.Server.BaseURL},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Content-Type", "Authorization"},
+		AllowedHeaders:   []string{"Content-Type"},
 		AllowCredentials: true,
 	})
 
@@ -136,11 +112,9 @@ func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fs := http.Dir(h.staticPath)
 	f, err := fs.Open(r.URL.Path)
 	if err != nil {
-		// File not found — serve index.html for SPA routing
 		http.ServeFile(w, r, fmt.Sprintf("%s/%s", h.staticPath, h.indexPath))
 		return
 	}
 	f.Close()
-
 	http.FileServer(fs).ServeHTTP(w, r)
 }

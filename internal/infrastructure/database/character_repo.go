@@ -18,7 +18,7 @@ func NewCharacterRepo(db *sql.DB) *SQLiteCharacterRepo {
 	return &SQLiteCharacterRepo{db: db}
 }
 
-const charCols = `id, profile_id, account_name, name, league, class_id, class, ascendancy, level, experience, created_at, updated_at`
+const charCols = `id, account_name, name, league, class_id, class, ascendancy, level, experience, created_at, updated_at`
 
 func (r *SQLiteCharacterRepo) GetByID(ctx context.Context, id int64) (*model.Character, error) {
 	row := r.db.QueryRowContext(ctx, `SELECT `+charCols+` FROM characters WHERE id = ?`, id)
@@ -30,15 +30,6 @@ func (r *SQLiteCharacterRepo) GetByAccountAndName(ctx context.Context, accountNa
 	return scanCharacter(row)
 }
 
-func (r *SQLiteCharacterRepo) ListByAccount(ctx context.Context, accountName string) ([]model.Character, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+charCols+` FROM characters WHERE account_name = ? ORDER BY league ASC, level DESC, name ASC`, accountName)
-	if err != nil {
-		return nil, fmt.Errorf("querying characters: %w", err)
-	}
-	defer rows.Close()
-	return scanCharacters(rows)
-}
-
 func (r *SQLiteCharacterRepo) ListByFilter(ctx context.Context, filter model.CharacterFilter) ([]model.Character, error) {
 	var conditions []string
 	var args []interface{}
@@ -47,13 +38,13 @@ func (r *SQLiteCharacterRepo) ListByFilter(ctx context.Context, filter model.Cha
 		conditions = append(conditions, "account_name = ?")
 		args = append(args, filter.AccountName)
 	}
-	if filter.ProfileID != nil {
-		conditions = append(conditions, "profile_id = ?")
-		args = append(args, *filter.ProfileID)
-	}
 	if filter.League != "" {
 		conditions = append(conditions, "league = ?")
 		args = append(args, filter.League)
+	}
+	if filter.Class != "" {
+		conditions = append(conditions, "(class = ? OR ascendancy = ?)")
+		args = append(args, filter.Class, filter.Class)
 	}
 
 	query := `SELECT ` + charCols + ` FROM characters`
@@ -97,13 +88,30 @@ func (r *SQLiteCharacterRepo) ListLeagues(ctx context.Context) ([]string, error)
 	return leagues, rows.Err()
 }
 
+func (r *SQLiteCharacterRepo) ListAccounts(ctx context.Context) ([]string, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT DISTINCT account_name FROM characters ORDER BY account_name ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var accounts []string
+	for rows.Next() {
+		var a string
+		if err := rows.Scan(&a); err != nil {
+			return nil, err
+		}
+		accounts = append(accounts, a)
+	}
+	return accounts, rows.Err()
+}
+
 func (r *SQLiteCharacterRepo) Upsert(ctx context.Context, char *model.Character) error {
 	now := time.Now().UTC()
 	result, err := r.db.ExecContext(ctx, `
-		INSERT INTO characters (profile_id, account_name, name, league, class_id, class, ascendancy, level, experience, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO characters (account_name, name, league, class_id, class, ascendancy, level, experience, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(account_name, name) DO UPDATE SET
-			profile_id = COALESCE(excluded.profile_id, characters.profile_id),
 			league = excluded.league,
 			class_id = excluded.class_id,
 			class = excluded.class,
@@ -111,7 +119,7 @@ func (r *SQLiteCharacterRepo) Upsert(ctx context.Context, char *model.Character)
 			level = excluded.level,
 			experience = excluded.experience,
 			updated_at = excluded.updated_at`,
-		char.ProfileID, char.AccountName, char.Name, char.League, char.ClassID, char.Class,
+		char.AccountName, char.Name, char.League, char.ClassID, char.Class,
 		char.Ascendancy, char.Level, char.Experience, now, now)
 	if err != nil {
 		return fmt.Errorf("upserting character: %w", err)
@@ -132,7 +140,7 @@ func (r *SQLiteCharacterRepo) Delete(ctx context.Context, id int64) error {
 
 func scanCharacter(row *sql.Row) (*model.Character, error) {
 	var c model.Character
-	err := row.Scan(&c.ID, &c.ProfileID, &c.AccountName, &c.Name, &c.League, &c.ClassID,
+	err := row.Scan(&c.ID, &c.AccountName, &c.Name, &c.League, &c.ClassID,
 		&c.Class, &c.Ascendancy, &c.Level, &c.Experience, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -144,7 +152,7 @@ func scanCharacters(rows *sql.Rows) ([]model.Character, error) {
 	var chars []model.Character
 	for rows.Next() {
 		var c model.Character
-		if err := rows.Scan(&c.ID, &c.ProfileID, &c.AccountName, &c.Name, &c.League, &c.ClassID,
+		if err := rows.Scan(&c.ID, &c.AccountName, &c.Name, &c.League, &c.ClassID,
 			&c.Class, &c.Ascendancy, &c.Level, &c.Experience, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}

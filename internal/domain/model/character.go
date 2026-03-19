@@ -5,7 +5,6 @@ import "time"
 // Character represents the core domain entity for a PoE character.
 type Character struct {
 	ID          int64     `json:"id"`
-	ProfileID   *int64    `json:"profileId,omitempty"`
 	AccountName string    `json:"accountName"`
 	Name        string    `json:"name"`
 	League      string    `json:"league"`
@@ -21,39 +20,39 @@ type Character struct {
 // CharacterFilter holds optional filter criteria for listing characters.
 type CharacterFilter struct {
 	AccountName string
-	ProfileID   *int64
 	League      string
+	Class       string
 }
 
 // CharacterSnapshot is a versioned point-in-time capture of a character's full state.
 type CharacterSnapshot struct {
-	ID          int64     `json:"id"`
-	CharacterID int64     `json:"characterId"`
-	Level       int       `json:"level"`
-	Experience  int64     `json:"experience"`
-	SnapshotAt  time.Time `json:"snapshotAt"`
-	Items       []Item    `json:"items"`
-	Gems        []Gem     `json:"gems"`
+	ID          int64        `json:"id"`
+	CharacterID int64        `json:"characterId"`
+	Level       int          `json:"level"`
+	Experience  int64        `json:"experience"`
+	SnapshotAt  time.Time    `json:"snapshotAt"`
+	Items       []Item       `json:"items"`
+	Gems        []Gem        `json:"gems"`
 	PassiveTree *PassiveTree `json:"passiveTree"`
 }
 
 // Item represents an equipped item on a character.
 type Item struct {
-	ID         int64             `json:"id"`
-	SnapshotID int64             `json:"snapshotId"`
-	Name       string            `json:"name"`
-	TypeLine   string            `json:"typeLine"`
-	BaseType   string            `json:"baseType"`
-	FrameType  int               `json:"frameType"`
-	Slot       string            `json:"slot"`
-	IconURL    string            `json:"iconUrl"`
-	Ilvl       int               `json:"ilvl"`
-	Identified bool              `json:"identified"`
-	Corrupted  bool              `json:"corrupted"`
-	Sockets    []Socket          `json:"sockets"`
-	Properties []ItemProperty    `json:"properties"`
-	Mods       ItemMods          `json:"mods"`
-	RawJSON    string            `json:"-"`
+	ID         int64          `json:"id"`
+	SnapshotID int64          `json:"snapshotId"`
+	Name       string         `json:"name"`
+	TypeLine   string         `json:"typeLine"`
+	BaseType   string         `json:"baseType"`
+	FrameType  int            `json:"frameType"`
+	Slot       string         `json:"slot"`
+	IconURL    string         `json:"iconUrl"`
+	Ilvl       int            `json:"ilvl"`
+	Identified bool           `json:"identified"`
+	Corrupted  bool           `json:"corrupted"`
+	Sockets    []Socket       `json:"sockets"`
+	Properties []ItemProperty `json:"properties"`
+	Mods       ItemMods       `json:"mods"`
+	RawJSON    string         `json:"-"`
 }
 
 // Socket represents a socket on an item.
@@ -80,28 +79,28 @@ type ItemMods struct {
 
 // Gem represents a skill gem socketed in an item.
 type Gem struct {
-	ID         int64  `json:"id"`
-	SnapshotID int64  `json:"snapshotId"`
-	ItemSlot   string `json:"itemSlot"`
-	SocketGroup int   `json:"socketGroup"`
-	Name       string `json:"name"`
-	TypeLine   string `json:"typeLine"`
-	IconURL    string `json:"iconUrl"`
-	Level      int    `json:"level"`
-	Quality    int    `json:"quality"`
-	IsSupport  bool   `json:"isSupport"`
-	RawJSON    string `json:"-"`
+	ID          int64  `json:"id"`
+	SnapshotID  int64  `json:"snapshotId"`
+	ItemSlot    string `json:"itemSlot"`
+	SocketGroup int    `json:"socketGroup"`
+	Name        string `json:"name"`
+	TypeLine    string `json:"typeLine"`
+	IconURL     string `json:"iconUrl"`
+	Level       int    `json:"level"`
+	Quality     int    `json:"quality"`
+	IsSupport   bool   `json:"isSupport"`
+	RawJSON     string `json:"-"`
 }
 
 // PassiveTree represents a character's passive skill tree allocation.
 type PassiveTree struct {
-	ID         int64           `json:"id"`
-	SnapshotID int64           `json:"snapshotId"`
-	Hashes     []int           `json:"hashes"`
-	Masteries  []MasteryAlloc  `json:"masteries"`
-	Keystones  []string        `json:"keystones"`
-	Jewels     []TreeJewel     `json:"jewels"`
-	RawJSON    string          `json:"-"`
+	ID         int64          `json:"id"`
+	SnapshotID int64          `json:"snapshotId"`
+	Hashes     []int          `json:"hashes"`
+	Masteries  []MasteryAlloc `json:"masteries"`
+	Keystones  []string       `json:"keystones"`
+	Jewels     []TreeJewel    `json:"jewels"`
+	RawJSON    string         `json:"-"`
 }
 
 // MasteryAlloc represents a mastery node allocation.

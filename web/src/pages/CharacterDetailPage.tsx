@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react"
 import { useParams, Link } from "react-router-dom"
 import { api } from "@/lib/api"
-import { useAuth } from "@/hooks/useAuth"
 import type { Character, CharacterSnapshot } from "@/types/character"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -16,7 +15,6 @@ import { SnapshotSelector } from "@/components/SnapshotSelector"
 
 export function CharacterDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { auth } = useAuth()
   const [character, setCharacter] = useState<Character | null>(null)
   const [snapshots, setSnapshots] = useState<CharacterSnapshot[]>([])
   const [activeSnapshot, setActiveSnapshot] = useState<CharacterSnapshot | null>(null)
@@ -112,12 +110,10 @@ export function CharacterDetailPage() {
             </span>
           </div>
         </div>
-        {auth.authenticated && (
-          <Button onClick={handleSnapshot} disabled={snapshotting}>
-            <Camera className="mr-2 h-4 w-4" />
-            {snapshotting ? "Snapshotting..." : "Take Snapshot"}
-          </Button>
-        )}
+        <Button onClick={handleSnapshot} disabled={snapshotting}>
+          <Camera className="mr-2 h-4 w-4" />
+          {snapshotting ? "Snapshotting..." : "Take Snapshot"}
+        </Button>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -157,11 +153,7 @@ export function CharacterDetailPage() {
           <CardContent className="py-12 text-center text-muted-foreground">
             <Clock className="mx-auto h-12 w-12 mb-4 opacity-50" />
             <p>No snapshots yet.</p>
-            {auth.authenticated ? (
-              <p className="text-sm">Click "Take Snapshot" to capture this character's current state.</p>
-            ) : (
-              <p className="text-sm">Login to take snapshots of this character.</p>
-            )}
+            <p className="text-sm">Click "Take Snapshot" to capture this character's current state from the PoE API.</p>
           </CardContent>
         </Card>
       )}

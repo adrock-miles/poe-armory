@@ -9,7 +9,7 @@ import (
 	"github.com/poe-armory/poe-armory/internal/domain/repository"
 )
 
-// PoeAPIClient defines the contract for fetching character data from the PoE API.
+// PoeAPIClient defines the contract for fetching character data from the PoE public API.
 type PoeAPIClient interface {
 	GetCharacters(ctx context.Context, accountName string) ([]model.Character, error)
 	GetItems(ctx context.Context, accountName, characterName string) ([]model.Item, []model.Gem, error)
@@ -35,9 +35,8 @@ func NewCharacterService(
 	}
 }
 
-// ImportCharacters fetches all characters for an account and upserts them.
-// If profileID is provided, characters are linked to that profile.
-func (s *CharacterService) ImportCharacters(ctx context.Context, accountName string, profileID *int64) ([]model.Character, error) {
+// ImportCharacters fetches all public characters for an account and upserts them.
+func (s *CharacterService) ImportCharacters(ctx context.Context, accountName string) ([]model.Character, error) {
 	characters, err := s.poeClient.GetCharacters(ctx, accountName)
 	if err != nil {
 		return nil, fmt.Errorf("fetching characters from PoE API: %w", err)
@@ -45,25 +44,6 @@ func (s *CharacterService) ImportCharacters(ctx context.Context, accountName str
 
 	for i := range characters {
 		characters[i].AccountName = accountName
-		characters[i].ProfileID = profileID
-		if err := s.charRepo.Upsert(ctx, &characters[i]); err != nil {
-			return nil, fmt.Errorf("upserting character %s: %w", characters[i].Name, err)
-		}
-	}
-
-	return characters, nil
-}
-
-// ImportCharactersWithClient uses a specific PoE client (e.g. with OAuth token).
-func (s *CharacterService) ImportCharactersWithClient(ctx context.Context, client PoeAPIClient, accountName string, profileID *int64) ([]model.Character, error) {
-	characters, err := client.GetCharacters(ctx, accountName)
-	if err != nil {
-		return nil, fmt.Errorf("fetching characters from PoE API: %w", err)
-	}
-
-	for i := range characters {
-		characters[i].AccountName = accountName
-		characters[i].ProfileID = profileID
 		if err := s.charRepo.Upsert(ctx, &characters[i]); err != nil {
 			return nil, fmt.Errorf("upserting character %s: %w", characters[i].Name, err)
 		}
@@ -106,40 +86,6 @@ func (s *CharacterService) SnapshotCharacter(ctx context.Context, accountName, c
 	return snapshot, nil
 }
 
-// SnapshotCharacterWithClient uses a specific PoE client for the snapshot.
-func (s *CharacterService) SnapshotCharacterWithClient(ctx context.Context, client PoeAPIClient, accountName, characterName string) (*model.CharacterSnapshot, error) {
-	char, err := s.charRepo.GetByAccountAndName(ctx, accountName, characterName)
-	if err != nil {
-		return nil, fmt.Errorf("finding character: %w", err)
-	}
-
-	items, gems, err := client.GetItems(ctx, accountName, characterName)
-	if err != nil {
-		return nil, fmt.Errorf("fetching items: %w", err)
-	}
-
-	tree, err := client.GetPassiveTree(ctx, accountName, characterName)
-	if err != nil {
-		return nil, fmt.Errorf("fetching passive tree: %w", err)
-	}
-
-	snapshot := &model.CharacterSnapshot{
-		CharacterID: char.ID,
-		Level:       char.Level,
-		Experience:  char.Experience,
-		SnapshotAt:  time.Now().UTC(),
-		Items:       items,
-		Gems:        gems,
-		PassiveTree: tree,
-	}
-
-	if err := s.snapshotRepo.Create(ctx, snapshot); err != nil {
-		return nil, fmt.Errorf("saving snapshot: %w", err)
-	}
-
-	return snapshot, nil
-}
-
 // GetCharacter retrieves a character by ID.
 func (s *CharacterService) GetCharacter(ctx context.Context, id int64) (*model.Character, error) {
 	return s.charRepo.GetByID(ctx, id)
@@ -153,6 +99,11 @@ func (s *CharacterService) ListCharacters(ctx context.Context, filter model.Char
 // ListLeagues returns all distinct leagues with characters.
 func (s *CharacterService) ListLeagues(ctx context.Context) ([]string, error) {
 	return s.charRepo.ListLeagues(ctx)
+}
+
+// ListAccounts returns all distinct account names.
+func (s *CharacterService) ListAccounts(ctx context.Context) ([]string, error) {
+	return s.charRepo.ListAccounts(ctx)
 }
 
 // GetSnapshots lists all snapshots for a character.

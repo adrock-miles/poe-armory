@@ -14,50 +14,64 @@ import (
 	"github.com/poe-armory/poe-armory/internal/domain/model"
 )
 
-const baseURL = "https://www.pathofexile.com"
-
-// Client communicates with the Path of Exile character-window API.
-type Client struct {
-	httpClient  *http.Client
-	sessionID   string
-	accessToken string
-	userAgent   string
+// Realm defines a PoE realm with its host and profile URL path.
+type Realm struct {
+	Label      string
+	RealmCode  string
+	HostName   string
+	ProfileURL string
 }
 
-func New(sessionID, userAgent string) *Client {
+// Standard realms matching Path of Building's realmList.
+var (
+	RealmPC = Realm{
+		Label:      "PC",
+		RealmCode:  "pc",
+		HostName:   "https://www.pathofexile.com/",
+		ProfileURL: "account/view-profile/",
+	}
+	RealmXbox = Realm{
+		Label:      "Xbox",
+		RealmCode:  "xbox",
+		HostName:   "https://www.pathofexile.com/",
+		ProfileURL: "account/xbox/view-profile/",
+	}
+	RealmPS4 = Realm{
+		Label:      "PS4",
+		RealmCode:  "sony",
+		HostName:   "https://www.pathofexile.com/",
+		ProfileURL: "account/sony/view-profile/",
+	}
+)
+
+// Client communicates with the PoE public character-window API.
+// Follows the same endpoints as Path of Building's ImportTab.lua.
+type Client struct {
+	httpClient *http.Client
+	userAgent  string
+	realm      Realm
+}
+
+func New(userAgent string, realm Realm) *Client {
 	return &Client{
 		httpClient: &http.Client{Timeout: 30 * time.Second},
-		sessionID:  sessionID,
 		userAgent:  userAgent,
+		realm:      realm,
 	}
 }
 
-func (c *Client) doRequest(ctx context.Context, method, path string, params url.Values) ([]byte, error) {
-	var req *http.Request
-	var err error
-
-	fullURL := baseURL + path
-	if method == http.MethodGet && params != nil {
+func (c *Client) doRequest(ctx context.Context, path string, params url.Values) ([]byte, error) {
+	fullURL := c.realm.HostName + path
+	if params != nil {
 		fullURL += "?" + params.Encode()
-		req, err = http.NewRequestWithContext(ctx, method, fullURL, nil)
-	} else if method == http.MethodPost {
-		req, err = http.NewRequestWithContext(ctx, method, fullURL, strings.NewReader(params.Encode()))
-		if req != nil {
-			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		}
-	} else {
-		req, err = http.NewRequestWithContext(ctx, method, fullURL, nil)
 	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
 	req.Header.Set("User-Agent", c.userAgent)
-	if c.accessToken != "" {
-		req.Header.Set("Authorization", "Bearer "+c.accessToken)
-	} else if c.sessionID != "" {
-		req.AddCookie(&http.Cookie{Name: "POESESSID", Value: c.sessionID})
-	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -70,11 +84,16 @@ func (c *Client) doRequest(ctx context.Context, method, path string, params url.
 		return nil, fmt.Errorf("reading response: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return body, nil
+	case http.StatusForbidden:
+		return nil, fmt.Errorf("account profile is private — the profile must be set to public on pathofexile.com")
+	case http.StatusNotFound:
+		return nil, fmt.Errorf("account not found")
+	default:
 		return nil, fmt.Errorf("PoE API returned status %d: %s", resp.StatusCode, string(body))
 	}
-
-	return body, nil
 }
 
 // poeCharacter is the raw API response structure for a character.
@@ -87,9 +106,23 @@ type poeCharacter struct {
 	Experience int64  `json:"experience"`
 }
 
+// GetCharacters fetches all characters for a public account.
+// Endpoint: {hostName}character-window/get-characters?accountName={name}&realm={code}
 func (c *Client) GetCharacters(ctx context.Context, accountName string) ([]model.Character, error) {
-	params := url.Values{"accountName": {accountName}}
-	body, err := c.doRequest(ctx, http.MethodGet, "/character-window/get-characters", params)
+	// PoB: for PC realm, strip all spaces from account name
+	cleanName := accountName
+	if c.realm.RealmCode == "pc" {
+		cleanName = strings.ReplaceAll(cleanName, " ", "")
+	} else {
+		cleanName = strings.TrimSpace(cleanName)
+		cleanName = strings.ReplaceAll(cleanName, " ", "+")
+	}
+
+	params := url.Values{
+		"accountName": {cleanName},
+		"realm":       {c.realm.RealmCode},
+	}
+	body, err := c.doRequest(ctx, "character-window/get-characters", params)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +136,6 @@ func (c *Client) GetCharacters(ctx context.Context, accountName string) ([]model
 	for i, r := range raw {
 		ascendancy := ""
 		class := r.Class
-		// PoE returns the ascendancy as the class name if ascended
 		if isAscendancy(r.Class) {
 			ascendancy = r.Class
 			class = baseClassForAscendancy(r.Class)
@@ -129,23 +161,23 @@ type poeItemsResponse struct {
 }
 
 type poeRawItem struct {
-	Name            string            `json:"name"`
-	TypeLine        string            `json:"typeLine"`
-	BaseType        string            `json:"baseType"`
-	FrameType       int               `json:"frameType"`
-	InventoryId     string            `json:"inventoryId"`
-	Icon            string            `json:"icon"`
-	Ilvl            int               `json:"ilvl"`
-	Identified      bool              `json:"identified"`
-	Corrupted       bool              `json:"corrupted"`
-	Sockets         []model.Socket    `json:"sockets"`
-	SocketedItems   []json.RawMessage `json:"socketedItems"`
-	ImplicitMods    []string          `json:"implicitMods"`
-	ExplicitMods    []string          `json:"explicitMods"`
-	CraftedMods     []string          `json:"craftedMods"`
-	EnchantMods     []string          `json:"enchantMods"`
-	FracturedMods   []string          `json:"fracturedMods"`
-	Properties      []model.ItemProperty `json:"properties"`
+	Name          string               `json:"name"`
+	TypeLine      string               `json:"typeLine"`
+	BaseType      string               `json:"baseType"`
+	FrameType     int                  `json:"frameType"`
+	InventoryId   string               `json:"inventoryId"`
+	Icon          string               `json:"icon"`
+	Ilvl          int                  `json:"ilvl"`
+	Identified    bool                 `json:"identified"`
+	Corrupted     bool                 `json:"corrupted"`
+	Sockets       []model.Socket       `json:"sockets"`
+	SocketedItems []json.RawMessage    `json:"socketedItems"`
+	ImplicitMods  []string             `json:"implicitMods"`
+	ExplicitMods  []string             `json:"explicitMods"`
+	CraftedMods   []string             `json:"craftedMods"`
+	EnchantMods   []string             `json:"enchantMods"`
+	FracturedMods []string             `json:"fracturedMods"`
+	Properties    []model.ItemProperty `json:"properties"`
 }
 
 type poeRawGem struct {
@@ -159,12 +191,15 @@ type poeRawGem struct {
 	} `json:"properties"`
 }
 
+// GetItems fetches equipped items and socketed gems for a character.
+// Endpoint: {hostName}character-window/get-items?accountName={name}&character={charName}&realm={code}
 func (c *Client) GetItems(ctx context.Context, accountName, characterName string) ([]model.Item, []model.Gem, error) {
 	params := url.Values{
 		"accountName": {accountName},
 		"character":   {characterName},
+		"realm":       {c.realm.RealmCode},
 	}
-	body, err := c.doRequest(ctx, http.MethodGet, "/character-window/get-items", params)
+	body, err := c.doRequest(ctx, "character-window/get-items", params)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -206,8 +241,8 @@ func (c *Client) GetItems(ctx context.Context, accountName, characterName string
 		}
 		items = append(items, item)
 
-		// Extract socketed gems
-		for _, socketedRaw := range raw.SocketedItems {
+		// Extract socketed gems from this item
+		for si, socketedRaw := range raw.SocketedItems {
 			var rawGem poeRawGem
 			if err := json.Unmarshal(socketedRaw, &rawGem); err != nil {
 				continue
@@ -219,9 +254,15 @@ func (c *Client) GetItems(ctx context.Context, accountName, characterName string
 				gemName = rawGem.Name
 			}
 
+			// Determine socket group from the item's socket list
+			socketGroup := 0
+			if si < len(raw.Sockets) {
+				socketGroup = raw.Sockets[si].Group
+			}
+
 			gem := model.Gem{
 				ItemSlot:    raw.InventoryId,
-				SocketGroup: 0,
+				SocketGroup: socketGroup,
 				Name:        gemName,
 				TypeLine:    rawGem.TypeLine,
 				IconURL:     rawGem.Icon,
@@ -237,20 +278,23 @@ func (c *Client) GetItems(ctx context.Context, accountName, characterName string
 	return items, gems, nil
 }
 
+// poePassiveResponse is the raw response from get-passive-skills.
 type poePassiveResponse struct {
-	Hashes          []int             `json:"hashes"`
-	HashesEx        []int             `json:"hashes_ex"`
-	MasteryEffects  map[string]int    `json:"mastery_effects"`
-	Items           []json.RawMessage `json:"items"`
+	Hashes         []int             `json:"hashes"`
+	HashesEx       []int             `json:"hashes_ex"`
+	MasteryEffects map[string]int    `json:"mastery_effects"`
+	Items          []json.RawMessage `json:"items"`
 }
 
+// GetPassiveTree fetches the passive skill tree for a character.
+// Endpoint: {hostName}character-window/get-passive-skills?accountName={name}&character={charName}&realm={code}
 func (c *Client) GetPassiveTree(ctx context.Context, accountName, characterName string) (*model.PassiveTree, error) {
 	params := url.Values{
 		"accountName": {accountName},
 		"character":   {characterName},
-		"reqData":     {"0"},
+		"realm":       {c.realm.RealmCode},
 	}
-	body, err := c.doRequest(ctx, http.MethodGet, "/character-window/get-passive-skills", params)
+	body, err := c.doRequest(ctx, "character-window/get-passive-skills", params)
 	if err != nil {
 		return nil, err
 	}
@@ -262,6 +306,7 @@ func (c *Client) GetPassiveTree(ctx context.Context, accountName, characterName 
 
 	allHashes := append(resp.Hashes, resp.HashesEx...)
 
+	// Parse mastery effects — encoded as pairs where lower 16 bits = mastery, upper 16 bits = effect
 	var masteries []model.MasteryAlloc
 	for nodeStr, effectHash := range resp.MasteryEffects {
 		nodeHash, _ := strconv.Atoi(nodeStr)
@@ -271,6 +316,7 @@ func (c *Client) GetPassiveTree(ctx context.Context, accountName, characterName 
 		})
 	}
 
+	// Parse tree jewels
 	var jewels []model.TreeJewel
 	for _, rawJewel := range resp.Items {
 		var j struct {

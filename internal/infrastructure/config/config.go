@@ -11,8 +11,6 @@ type Config struct {
 	Server   ServerConfig   `mapstructure:"server"`
 	Database DatabaseConfig `mapstructure:"database"`
 	PoE      PoEConfig      `mapstructure:"poe"`
-	OAuth    OAuthConfig    `mapstructure:"oauth"`
-	Session  SessionConfig  `mapstructure:"session"`
 }
 
 type ServerConfig struct {
@@ -29,17 +27,6 @@ type PoEConfig struct {
 	UserAgent string `mapstructure:"user_agent"`
 }
 
-type OAuthConfig struct {
-	ClientID     string `mapstructure:"client_id"`
-	ClientSecret string `mapstructure:"client_secret"`
-	RedirectURI  string `mapstructure:"redirect_uri"`
-}
-
-type SessionConfig struct {
-	Secret   string `mapstructure:"secret"`
-	MaxAge   int    `mapstructure:"max_age"`
-}
-
 func Load() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
@@ -51,8 +38,6 @@ func Load() (*Config, error) {
 	viper.SetDefault("server.base_url", "http://localhost:8080")
 	viper.SetDefault("database.path", "./data/poe-armory.db")
 	viper.SetDefault("poe.user_agent", "PoeArmory/1.0")
-	viper.SetDefault("session.secret", "change-me-in-production")
-	viper.SetDefault("session.max_age", 36000) // 10 hours, matches PoE token lifetime
 
 	viper.SetEnvPrefix("POE_ARMORY")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
