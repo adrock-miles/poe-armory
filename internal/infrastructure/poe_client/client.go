@@ -362,7 +362,14 @@ func parseGemProperties(props []struct {
 	for _, p := range props {
 		if len(p.Values) > 0 && len(p.Values[0]) > 0 {
 			valStr := fmt.Sprintf("%v", p.Values[0][0])
-			val, _ := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(valStr, "+"), "%"))
+			// Strip common decorations: "+", "%", " (Max)", etc.
+			valStr = strings.TrimPrefix(valStr, "+")
+			valStr = strings.TrimSuffix(valStr, "%")
+			// Handle values like "21 (Max)" — take only the leading number
+			if idx := strings.IndexByte(valStr, ' '); idx != -1 {
+				valStr = valStr[:idx]
+			}
+			val, _ := strconv.Atoi(valStr)
 			switch p.Name {
 			case "Level":
 				level = val
