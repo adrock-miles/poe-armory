@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - poe-data:/app/data
+    environment:
+      - POE_ARMORY_POE_POESESSID=${POE_ARMORY_POE_POESESSID:-}
+    restart: unless-stopped
+
+volumes:
+  poe-data:
