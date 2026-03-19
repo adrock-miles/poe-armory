@@ -25,7 +25,6 @@ COPY --from=backend-builder /app/web/dist ./web/dist
 COPY config.yaml .
 
 RUN mkdir -p /app/data
-VOLUME ["/app/data"]
 
 EXPOSE 8080
 ENTRYPOINT ["./poe-armory"]
