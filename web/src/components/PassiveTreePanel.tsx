@@ -1,7 +1,8 @@
+import { useMemo } from "react"
 import type { PassiveTree } from "@/types/character"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
+import { SkillTreeCanvas } from "@/components/SkillTreeCanvas"
 
 interface Props {
   tree: PassiveTree | null
@@ -23,6 +24,21 @@ export function PassiveTreePanel({ tree }: Props) {
   const jewelCount = tree.jewels?.length ?? 0
   const keystoneCount = tree.keystones?.length ?? 0
 
+  const allocatedHashes = useMemo(
+    () => new Set(tree.hashes || []),
+    [tree.hashes]
+  )
+
+  const masteryEffects = useMemo(() => {
+    const map = new Map<number, number>()
+    if (tree.masteries) {
+      for (const m of tree.masteries) {
+        map.set(m.nodeHash, m.effectHash)
+      }
+    }
+    return map
+  }, [tree.masteries])
+
   return (
     <div className="space-y-4">
       {/* Stats Overview */}
@@ -32,6 +48,12 @@ export function PassiveTreePanel({ tree }: Props) {
         <StatCard label="Keystones" value={keystoneCount} />
         <StatCard label="Jewels" value={jewelCount} />
       </div>
+
+      {/* Interactive Skill Tree */}
+      <SkillTreeCanvas
+        allocatedHashes={allocatedHashes}
+        masteryEffects={masteryEffects}
+      />
 
       {/* Keystones */}
       {tree.keystones && tree.keystones.length > 0 && (
@@ -93,24 +115,6 @@ export function PassiveTreePanel({ tree }: Props) {
           </CardContent>
         </Card>
       )}
-
-      {/* Node Hashes (collapsible) */}
-      <Card>
-        <CardContent className="p-4">
-          <h3 className="text-sm font-medium text-muted-foreground mb-3">
-            Allocated Node IDs ({totalNodes})
-          </h3>
-          <div className="max-h-48 overflow-y-auto">
-            <div className="flex flex-wrap gap-1">
-              {(tree.hashes || []).map((hash, i) => (
-                <span key={i} className="text-xs font-mono text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
-                  {hash}
-                </span>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }
