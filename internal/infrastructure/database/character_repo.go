@@ -138,6 +138,21 @@ func (r *SQLiteCharacterRepo) Delete(ctx context.Context, id int64) error {
 	return err
 }
 
+func (r *SQLiteCharacterRepo) DeleteMany(ctx context.Context, ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	query := `DELETE FROM characters WHERE id IN (` + strings.Join(placeholders, ",") + `)`
+	_, err := r.db.ExecContext(ctx, query, args...)
+	return err
+}
+
 func scanCharacter(row *sql.Row) (*model.Character, error) {
 	var c model.Character
 	err := row.Scan(&c.ID, &c.AccountName, &c.Name, &c.League, &c.ClassID,

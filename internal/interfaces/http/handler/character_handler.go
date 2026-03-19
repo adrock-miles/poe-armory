@@ -19,8 +19,37 @@ func NewCharacterHandler(svc *service.CharacterService) *CharacterHandler {
 	return &CharacterHandler{svc: svc}
 }
 
-type importRequest struct {
+type previewRequest struct {
 	AccountName string `json:"accountName"`
+}
+
+func (h *CharacterHandler) PreviewCharacters(w http.ResponseWriter, r *http.Request) {
+	var req previewRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.AccountName == "" {
+		writeError(w, http.StatusBadRequest, "accountName is required")
+		return
+	}
+
+	chars, err := h.svc.PreviewCharacters(r.Context(), req.AccountName)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if chars == nil {
+		chars = []model.Character{}
+	}
+
+	writeJSON(w, http.StatusOK, chars)
+}
+
+type importRequest struct {
+	AccountName string   `json:"accountName"`
+	League      string   `json:"league"`
+	Characters  []string `json:"characters"`
 }
 
 func (h *CharacterHandler) ImportCharacters(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +63,7 @@ func (h *CharacterHandler) ImportCharacters(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	chars, err := h.svc.ImportCharacters(r.Context(), req.AccountName)
+	chars, err := h.svc.ImportCharacters(r.Context(), req.AccountName, req.League, req.Characters)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -99,6 +128,28 @@ func (h *CharacterHandler) GetCharacter(w http.ResponseWriter, r *http.Request) 
 func (h *CharacterHandler) DeleteCharacter(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
 	if err := h.svc.DeleteCharacter(r.Context(), id); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+type batchDeleteRequest struct {
+	IDs []int64 `json:"ids"`
+}
+
+func (h *CharacterHandler) BatchDeleteCharacters(w http.ResponseWriter, r *http.Request) {
+	var req batchDeleteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if len(req.IDs) == 0 {
+		writeError(w, http.StatusBadRequest, "ids is required")
+		return
+	}
+
+	if err := h.svc.BatchDeleteCharacters(r.Context(), req.IDs); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

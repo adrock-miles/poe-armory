@@ -35,21 +35,51 @@ func NewCharacterService(
 	}
 }
 
-// ImportCharacters fetches all public characters for an account and upserts them.
-func (s *CharacterService) ImportCharacters(ctx context.Context, accountName string) ([]model.Character, error) {
+// PreviewCharacters fetches all public characters for an account without saving them.
+func (s *CharacterService) PreviewCharacters(ctx context.Context, accountName string) ([]model.Character, error) {
+	characters, err := s.poeClient.GetCharacters(ctx, accountName)
+	if err != nil {
+		return nil, fmt.Errorf("fetching characters from PoE API: %w", err)
+	}
+	for i := range characters {
+		characters[i].AccountName = accountName
+	}
+	return characters, nil
+}
+
+// ImportCharacters fetches public characters for an account, optionally filtered by league and
+// character names, and upserts them.
+func (s *CharacterService) ImportCharacters(ctx context.Context, accountName string, league string, names []string) ([]model.Character, error) {
 	characters, err := s.poeClient.GetCharacters(ctx, accountName)
 	if err != nil {
 		return nil, fmt.Errorf("fetching characters from PoE API: %w", err)
 	}
 
+	nameSet := make(map[string]bool, len(names))
+	for _, n := range names {
+		nameSet[n] = true
+	}
+
+	var imported []model.Character
 	for i := range characters {
 		characters[i].AccountName = accountName
+
+		// Filter by league if specified
+		if league != "" && characters[i].League != league {
+			continue
+		}
+		// Filter by character names if specified
+		if len(nameSet) > 0 && !nameSet[characters[i].Name] {
+			continue
+		}
+
 		if err := s.charRepo.Upsert(ctx, &characters[i]); err != nil {
 			return nil, fmt.Errorf("upserting character %s: %w", characters[i].Name, err)
 		}
+		imported = append(imported, characters[i])
 	}
 
-	return characters, nil
+	return imported, nil
 }
 
 // SnapshotCharacter creates a point-in-time snapshot of a character's full state.
@@ -124,4 +154,9 @@ func (s *CharacterService) GetLatestSnapshot(ctx context.Context, characterID in
 // DeleteCharacter removes a character and its data.
 func (s *CharacterService) DeleteCharacter(ctx context.Context, id int64) error {
 	return s.charRepo.Delete(ctx, id)
+}
+
+// BatchDeleteCharacters removes multiple characters by IDs.
+func (s *CharacterService) BatchDeleteCharacters(ctx context.Context, ids []int64) error {
+	return s.charRepo.DeleteMany(ctx, ids)
 }

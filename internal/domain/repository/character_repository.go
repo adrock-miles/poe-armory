@@ -16,6 +16,7 @@ type CharacterRepository interface {
 	ListAccounts(ctx context.Context) ([]string, error)
 	Upsert(ctx context.Context, char *model.Character) error
 	Delete(ctx context.Context, id int64) error
+	DeleteMany(ctx context.Context, ids []int64) error
 }
 
 // SnapshotRepository defines the persistence contract for character snapshots.

@@ -25,6 +25,7 @@ config.local.yaml
 # Node
 web/node_modules/
 web/dist/
+*.tsbuildinfo
 
 # OS
 .DS_Store
