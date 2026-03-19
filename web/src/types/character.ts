@@ -92,4 +92,9 @@ export interface TreeJewel {
   itemId: string
   name: string
   typeLine: string
+  baseType?: string
+  frameType?: number
+  iconUrl?: string
+  implicitMods?: string[]
+  explicitMods?: string[]
 }

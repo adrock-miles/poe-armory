@@ -148,7 +148,7 @@ export function GearPanel({ items, gems }: Props) {
   }
 
   return (
-    <div className="space-y-4" ref={containerRef}>
+    <div className="space-y-4 pb-[300px] md:pb-[200px]" ref={containerRef}>
       {/* Paper-doll grid — stacks to 2-column on mobile */}
       <div className="hidden md:grid gap-2 mx-auto max-w-[700px]" style={{
         gridTemplateColumns: "repeat(7, 1fr)",
@@ -445,14 +445,22 @@ function ItemPopover({
     const el = popoverRef.current
     if (!el) return
     const rect = el.getBoundingClientRect()
-    if (rect.right > window.innerWidth) {
+    // Horizontal overflow
+    if (rect.right > window.innerWidth - 8) {
       el.style.left = "auto"
       el.style.right = "0"
       el.style.transform = "none"
     }
-    if (rect.left < 0) {
+    if (rect.left < 8) {
       el.style.left = "0"
       el.style.transform = "none"
+    }
+    // Bottom overflow — flip above the slot
+    if (rect.bottom > window.innerHeight - 8) {
+      el.style.top = "auto"
+      el.style.bottom = "100%"
+      el.style.marginTop = "0"
+      el.style.marginBottom = "4px"
     }
   }, [])
 

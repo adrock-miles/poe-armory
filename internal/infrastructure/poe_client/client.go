@@ -320,15 +320,25 @@ func (c *Client) GetPassiveTree(ctx context.Context, accountName, characterName 
 	var jewels []model.TreeJewel
 	for _, rawJewel := range resp.Items {
 		var j struct {
-			Name     string `json:"name"`
-			TypeLine string `json:"typeLine"`
-			X        int    `json:"x"`
+			Name         string   `json:"name"`
+			TypeLine     string   `json:"typeLine"`
+			BaseType     string   `json:"baseType"`
+			FrameType    int      `json:"frameType"`
+			Icon         string   `json:"icon"`
+			X            int      `json:"x"`
+			ImplicitMods []string `json:"implicitMods"`
+			ExplicitMods []string `json:"explicitMods"`
 		}
 		if err := json.Unmarshal(rawJewel, &j); err == nil {
 			jewels = append(jewels, model.TreeJewel{
-				NodeHash: j.X,
-				Name:     j.Name,
-				TypeLine: j.TypeLine,
+				NodeHash:     j.X,
+				Name:         j.Name,
+				TypeLine:     j.TypeLine,
+				BaseType:     j.BaseType,
+				FrameType:    j.FrameType,
+				IconURL:      j.Icon,
+				ImplicitMods: j.ImplicitMods,
+				ExplicitMods: j.ExplicitMods,
 			})
 		}
 	}

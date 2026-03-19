@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from "react"
 import type { TreeJewel } from "@/types/character"
+import { frameTypeToColor } from "@/lib/utils"
 
 interface TreeNode {
   id: number
@@ -729,18 +730,28 @@ function NodeTooltip({
     A: "text-purple-300",
   }
 
-  // Position tooltip to avoid overflow
-  const tooltipWidth = 280
-  const tooltipHeight = 200
-  let left = x + 15
-  let top = y + 15
-  if (left + tooltipWidth > containerWidth) left = x - tooltipWidth - 10
-  if (top + tooltipHeight > containerHeight) top = Math.max(5, containerHeight - tooltipHeight - 5)
+  // Position tooltip to avoid overflow — use a ref to measure actual size
+  const tooltipRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ left: x + 15, top: y + 15 })
+  useEffect(() => {
+    const el = tooltipRef.current
+    if (!el) return
+    const tw = el.offsetWidth
+    const th = el.offsetHeight
+    let left = x + 15
+    let top = y + 15
+    if (left + tw > containerWidth - 8) left = Math.max(4, x - tw - 10)
+    if (top + th > containerHeight - 8) top = Math.max(4, containerHeight - th - 8)
+    if (left < 4) left = 4
+    if (top < 4) top = 4
+    setPos({ left, top })
+  }, [x, y, containerWidth, containerHeight])
 
   return (
     <div
+      ref={tooltipRef}
       className="absolute z-50 pointer-events-none bg-[#1a1612] border border-[#3a3226] rounded-lg shadow-xl p-3 max-w-[280px]"
-      style={{ left, top }}
+      style={{ left: pos.left, top: pos.top }}
     >
       {/* Header */}
       <div className="flex items-center gap-2 mb-1">
@@ -779,10 +790,36 @@ function NodeTooltip({
       {jewel && (
         <div className="mt-2 pt-2 border-t border-[#3a3226]">
           <div className="text-[10px] text-muted-foreground mb-1">Socketed Jewel</div>
-          {jewel.name && (
-            <div className="text-xs font-medium text-poe-unique">{jewel.name}</div>
+          <div className="flex items-start gap-2">
+            {jewel.iconUrl && (
+              <img src={jewel.iconUrl} alt={jewel.name || jewel.typeLine} className="w-8 h-8 object-contain flex-shrink-0" />
+            )}
+            <div className="min-w-0">
+              {jewel.name && (
+                <div
+                  className="text-xs font-medium truncate"
+                  style={{ color: frameTypeToColor(jewel.frameType ?? 0) }}
+                >
+                  {jewel.name}
+                </div>
+              )}
+              <div className="text-[11px] text-muted-foreground">{jewel.typeLine}</div>
+            </div>
+          </div>
+          {jewel.implicitMods && jewel.implicitMods.length > 0 && (
+            <div className="mt-1 space-y-0.5">
+              {jewel.implicitMods.map((mod, i) => (
+                <div key={`i${i}`} className="text-[11px] text-blue-400">{mod}</div>
+              ))}
+            </div>
           )}
-          <div className="text-[11px] text-muted-foreground">{jewel.typeLine}</div>
+          {jewel.explicitMods && jewel.explicitMods.length > 0 && (
+            <div className="mt-1 space-y-0.5">
+              {jewel.explicitMods.map((mod, i) => (
+                <div key={`x${i}`} className="text-[11px] text-blue-300">{mod}</div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

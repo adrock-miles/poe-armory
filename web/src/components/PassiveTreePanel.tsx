@@ -3,6 +3,7 @@ import type { PassiveTree } from "@/types/character"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { SkillTreeCanvas } from "@/components/SkillTreeCanvas"
+import { frameTypeToColor } from "@/lib/utils"
 
 interface Props {
   tree: PassiveTree | null
@@ -98,16 +99,38 @@ export function PassiveTreePanel({ tree }: Props) {
         <Card>
           <CardContent className="p-4">
             <h3 className="text-sm font-medium text-muted-foreground mb-3">Tree Jewels</h3>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {tree.jewels.map((j, i) => (
-                <div key={i} className="flex items-center gap-3 py-1">
-                  <div className="flex-1">
+                <div key={i} className="flex items-start gap-3 py-1">
+                  {j.iconUrl && (
+                    <img src={j.iconUrl} alt={j.name || j.typeLine} className="w-10 h-10 object-contain flex-shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
                     {j.name && (
-                      <div className="text-sm font-medium text-poe-unique">{j.name}</div>
+                      <div
+                        className="text-sm font-medium truncate"
+                        style={{ color: frameTypeToColor(j.frameType ?? 0) }}
+                      >
+                        {j.name}
+                      </div>
                     )}
                     <div className="text-xs text-muted-foreground">{j.typeLine}</div>
+                    {j.implicitMods && j.implicitMods.length > 0 && (
+                      <div className="mt-1 space-y-0.5">
+                        {j.implicitMods.map((mod, mi) => (
+                          <div key={`i${mi}`} className="text-[11px] text-blue-400">{mod}</div>
+                        ))}
+                      </div>
+                    )}
+                    {j.explicitMods && j.explicitMods.length > 0 && (
+                      <div className="mt-1 space-y-0.5">
+                        {j.explicitMods.map((mod, mi) => (
+                          <div key={`x${mi}`} className="text-[11px] text-blue-300">{mod}</div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <Badge variant="outline" className="text-[10px]">
+                  <Badge variant="outline" className="text-[10px] flex-shrink-0">
                     Node {j.nodeHash}
                   </Badge>
                 </div>

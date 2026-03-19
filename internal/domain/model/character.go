@@ -112,10 +112,15 @@ type MasteryAlloc struct {
 
 // TreeJewel represents a jewel socketed in the passive tree.
 type TreeJewel struct {
-	NodeHash int    `json:"nodeHash"`
-	ItemID   string `json:"itemId"`
-	Name     string `json:"name"`
-	TypeLine string `json:"typeLine"`
+	NodeHash     int      `json:"nodeHash"`
+	ItemID       string   `json:"itemId"`
+	Name         string   `json:"name"`
+	TypeLine     string   `json:"typeLine"`
+	BaseType     string   `json:"baseType,omitempty"`
+	FrameType    int      `json:"frameType"`
+	IconURL      string   `json:"iconUrl,omitempty"`
+	ImplicitMods []string `json:"implicitMods,omitempty"`
+	ExplicitMods []string `json:"explicitMods,omitempty"`
 }
 
 // AscendancyInfo holds parsed ascendancy data.
