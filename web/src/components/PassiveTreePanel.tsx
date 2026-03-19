@@ -53,6 +53,7 @@ export function PassiveTreePanel({ tree }: Props) {
       <SkillTreeCanvas
         allocatedHashes={allocatedHashes}
         masteryEffects={masteryEffects}
+        jewels={tree.jewels}
       />
 
       {/* Keystones */}

@@ -495,6 +495,9 @@ function ItemPopover({
         </div>
       )}
 
+      {/* Defense / weapon properties */}
+      <ItemProperties properties={item.properties} />
+
       {/* Mods */}
       <div className="space-y-0.5 mb-2 max-h-[200px] overflow-y-auto">
         {item.mods?.enchantMods?.map((mod, i) => (
@@ -543,6 +546,36 @@ function ItemPopover({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+const DEFENSE_PROPS = new Set([
+  "Armour", "Evasion Rating", "Energy Shield",
+  "Ward", "Block", "Chance to Block",
+])
+const WEAPON_PROPS = new Set([
+  "Physical Damage", "Elemental Damage", "Chaos Damage",
+  "Critical Strike Chance", "Attacks per Second",
+  "Weapon Range",
+])
+const DISPLAY_PROPS = new Set([...DEFENSE_PROPS, ...WEAPON_PROPS])
+
+function ItemProperties({ properties }: { properties?: import("@/types/character").ItemProperty[] }) {
+  if (!properties || properties.length === 0) return null
+  const shown = properties.filter((p) => DISPLAY_PROPS.has(p.name) && p.values?.length > 0)
+  if (shown.length === 0) return null
+
+  return (
+    <div className="space-y-0.5 mb-2 pb-2 border-b border-[#3a3226]">
+      {shown.map((prop, i) => (
+        <div key={i} className="flex justify-between text-[11px]">
+          <span className="text-muted-foreground">{prop.name}</span>
+          <span className={prop.values[0]?.[1] === 1 ? "text-blue-300" : "text-gray-200"}>
+            {prop.values.map((v) => v[0]).join(" - ")}
+          </span>
+        </div>
+      ))}
     </div>
   )
 }

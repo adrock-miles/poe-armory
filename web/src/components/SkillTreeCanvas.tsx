@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from "react"
+import type { TreeJewel } from "@/types/character"
 
 interface TreeNode {
   id: number
@@ -23,6 +24,7 @@ interface TreeData {
 interface Props {
   allocatedHashes: Set<number>
   masteryEffects?: Map<number, number> // nodeHash -> effectHash
+  jewels?: TreeJewel[]
   className?: string
 }
 
@@ -66,7 +68,7 @@ const NODE_COLORS: Record<string, Record<string, string>> = {
   },
 }
 
-export function SkillTreeCanvas({ allocatedHashes, masteryEffects, className }: Props) {
+export function SkillTreeCanvas({ allocatedHashes, masteryEffects, jewels, className }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [treeData, setTreeData] = useState<TreeData | null>(null)
@@ -76,6 +78,25 @@ export function SkillTreeCanvas({ allocatedHashes, masteryEffects, className }: 
   const transformRef = useRef({ x: 0, y: 0, scale: 0.04 })
   const dragRef = useRef({ dragging: false, startX: 0, startY: 0, startTx: 0, startTy: 0 })
 
+  // Touch state for pinch-zoom
+  const touchRef = useRef<{
+    lastDist: number
+    lastMidX: number
+    lastMidY: number
+    touchCount: number
+    startedDrag: boolean
+  }>({ lastDist: 0, lastMidX: 0, lastMidY: 0, touchCount: 0, startedDrag: false })
+
+  // Jewels lookup by nodeHash
+  const jewelsByNode = useRef<Map<number, TreeJewel>>(new Map())
+  useEffect(() => {
+    const m = new Map<number, TreeJewel>()
+    if (jewels) {
+      for (const j of jewels) m.set(j.nodeHash, j)
+    }
+    jewelsByNode.current = m
+  }, [jewels])
+
   // Tooltip state
   const [tooltip, setTooltip] = useState<{
     x: number
@@ -83,6 +104,7 @@ export function SkillTreeCanvas({ allocatedHashes, masteryEffects, className }: 
     node: TreeNode
     allocated: boolean
     selectedMastery?: { id: number; s: string[] }
+    jewel?: TreeJewel
   } | null>(null)
 
   // Load tree data
@@ -219,13 +241,20 @@ export function SkillTreeCanvas({ allocatedHashes, masteryEffects, className }: 
       // Skip very small nodes
       if (radius < 0.5) continue
 
-      const fillColor = allocated
-        ? NODE_COLORS.allocated[type] || NODE_COLORS.allocated.n
-        : NODE_COLORS.unallocated[type] || NODE_COLORS.unallocated.n
-      const borderColor = NODE_COLORS.border[type] || NODE_COLORS.border.n
+      // Jewel sockets with a socketed jewel get a special color
+      const hasJewel = type === "J" && jewelsByNode.current.has(node.id)
+
+      const fillColor = hasJewel
+        ? (allocated ? "#af6025" : "#6a3a15")
+        : allocated
+          ? NODE_COLORS.allocated[type] || NODE_COLORS.allocated.n
+          : NODE_COLORS.unallocated[type] || NODE_COLORS.unallocated.n
+      const borderColor = hasJewel
+        ? "#cf7030"
+        : NODE_COLORS.border[type] || NODE_COLORS.border.n
 
       ctx.fillStyle = fillColor
-      ctx.strokeStyle = allocated ? (NODE_COLORS.allocated[type] || "#c8a84e") : borderColor
+      ctx.strokeStyle = allocated ? (hasJewel ? "#cf7030" : NODE_COLORS.allocated[type] || "#c8a84e") : borderColor
       ctx.lineWidth = Math.max(0.5, scale * 8)
 
       if (type === "K") {
@@ -261,6 +290,13 @@ export function SkillTreeCanvas({ allocatedHashes, masteryEffects, className }: 
         ctx.rect(sx - radius, sy - radius, radius * 2, radius * 2)
         ctx.fill()
         ctx.stroke()
+        // Draw a small gem icon indicator if a jewel is socketed
+        if (hasJewel && radius > 2) {
+          ctx.fillStyle = "#cf7030"
+          ctx.beginPath()
+          ctx.arc(sx, sy, radius * 0.4, 0, Math.PI * 2)
+          ctx.fill()
+        }
       } else if (type === "M") {
         // Mastery: hexagon
         const sides = 6
@@ -290,18 +326,49 @@ export function SkillTreeCanvas({ allocatedHashes, masteryEffects, className }: 
           ctx.stroke()
         }
       }
-
-      // Draw name for larger nodes when zoomed in enough
-      if (scale > 0.06 && (type === "K" || type === "N") && node.n) {
-        ctx.fillStyle = allocated ? "#e8d8a8" : "#6a5e48"
-        ctx.font = `${Math.max(8, radius * 0.8)}px sans-serif`
-        ctx.textAlign = "center"
-        ctx.fillText(node.n, sx, sy + radius + Math.max(8, radius * 0.8) + 2)
-      }
     }
   }, [treeData, allocatedHashes])
 
-  // Mouse handlers for pan/zoom
+  // Hit-test helper — shared by mouse and touch
+  const hitTest = useCallback(
+    (canvasX: number, canvasY: number) => {
+      if (!treeData) return null
+      const { x: tx, y: ty, scale } = transformRef.current
+
+      let closest: { node: TreeNode; dist: number } | null = null
+      const threshold = 15
+
+      for (const node of Object.values(treeData.nodes)) {
+        const sx = tx + node.x * scale
+        const sy = ty + node.y * scale
+        const dx = canvasX - sx
+        const dy = canvasY - sy
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        const radius = (NODE_RADIUS[node.t] || 5) * scale * 10
+        if (dist < Math.max(radius + 3, threshold) && (!closest || dist < closest.dist)) {
+          closest = { node, dist }
+        }
+      }
+
+      if (!closest) return null
+
+      const node = closest.node
+      const allocated = allocatedHashes.has(node.id)
+      let selectedMastery: { id: number; s: string[] } | undefined
+      if (node.t === "M" && node.me && masteryEffects) {
+        const effectHash = masteryEffects.get(node.id)
+        if (effectHash) {
+          selectedMastery = node.me.find((m) => m.id === effectHash)
+        }
+      }
+      const jewel = node.t === "J" ? jewelsByNode.current.get(node.id) : undefined
+      return { node, allocated, selectedMastery, jewel }
+    },
+    [treeData, allocatedHashes, masteryEffects],
+  )
+
+  // ── Mouse handlers ──
+
   const handleWheel = useCallback(
     (e: WheelEvent) => {
       e.preventDefault()
@@ -323,7 +390,7 @@ export function SkillTreeCanvas({ allocatedHashes, masteryEffects, className }: 
       draw()
       setTooltip(null)
     },
-    [draw]
+    [draw],
   )
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -348,55 +415,140 @@ export function SkillTreeCanvas({ allocatedHashes, masteryEffects, className }: 
       }
 
       // Hit test for tooltip
-      if (!treeData || !canvasRef.current) return
-      const canvas = canvasRef.current
-      const rect = canvas.getBoundingClientRect()
+      if (!canvasRef.current) return
+      const rect = canvasRef.current.getBoundingClientRect()
       const mx = e.clientX - rect.left
       const my = e.clientY - rect.top
-      const { x: tx, y: ty, scale } = transformRef.current
-
-      let closest: { node: TreeNode; dist: number } | null = null
-      const threshold = 15
-
-      for (const node of Object.values(treeData.nodes)) {
-        const sx = tx + node.x * scale
-        const sy = ty + node.y * scale
-        const dx = mx - sx
-        const dy = my - sy
-        const dist = Math.sqrt(dx * dx + dy * dy)
-        const radius = (NODE_RADIUS[node.t] || 5) * scale * 10
-        if (dist < Math.max(radius + 3, threshold) && (!closest || dist < closest.dist)) {
-          closest = { node, dist }
-        }
-      }
-
-      if (closest) {
-        const node = closest.node
-        const allocated = allocatedHashes.has(node.id)
-        let selectedMastery: { id: number; s: string[] } | undefined
-        if (node.t === "M" && node.me && masteryEffects) {
-          const effectHash = masteryEffects.get(node.id)
-          if (effectHash) {
-            selectedMastery = node.me.find((m) => m.id === effectHash)
-          }
-        }
-        setTooltip({
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-          node,
-          allocated,
-          selectedMastery,
-        })
+      const hit = hitTest(mx, my)
+      if (hit) {
+        setTooltip({ x: mx, y: my, ...hit })
       } else {
         setTooltip(null)
       }
     },
-    [treeData, allocatedHashes, masteryEffects, draw]
+    [hitTest, draw],
   )
 
   const handleMouseUp = useCallback(() => {
     dragRef.current.dragging = false
   }, [])
+
+  // ── Touch handlers ──
+
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      const touches = e.touches
+      const tr = touchRef.current
+
+      if (touches.length === 1) {
+        // Single finger → drag
+        tr.touchCount = 1
+        tr.startedDrag = false
+        dragRef.current = {
+          dragging: true,
+          startX: touches[0].clientX,
+          startY: touches[0].clientY,
+          startTx: transformRef.current.x,
+          startTy: transformRef.current.y,
+        }
+      } else if (touches.length === 2) {
+        // Two fingers → pinch zoom
+        e.preventDefault()
+        tr.touchCount = 2
+        dragRef.current.dragging = false
+        const dx = touches[1].clientX - touches[0].clientX
+        const dy = touches[1].clientY - touches[0].clientY
+        tr.lastDist = Math.sqrt(dx * dx + dy * dy)
+        tr.lastMidX = (touches[0].clientX + touches[1].clientX) / 2
+        tr.lastMidY = (touches[0].clientY + touches[1].clientY) / 2
+      }
+    },
+    [],
+  )
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      const touches = e.touches
+      const tr = touchRef.current
+
+      if (touches.length === 1 && dragRef.current.dragging) {
+        // Pan
+        e.preventDefault()
+        tr.startedDrag = true
+        const d = dragRef.current
+        transformRef.current.x = d.startTx + (touches[0].clientX - d.startX)
+        transformRef.current.y = d.startTy + (touches[0].clientY - d.startY)
+        draw()
+        setTooltip(null)
+      } else if (touches.length === 2) {
+        // Pinch zoom
+        e.preventDefault()
+        const dx = touches[1].clientX - touches[0].clientX
+        const dy = touches[1].clientY - touches[0].clientY
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        const midX = (touches[0].clientX + touches[1].clientX) / 2
+        const midY = (touches[0].clientY + touches[1].clientY) / 2
+
+        if (tr.lastDist > 0) {
+          const canvas = canvasRef.current
+          if (!canvas) return
+          const rect = canvas.getBoundingClientRect()
+          const t = transformRef.current
+          const factor = dist / tr.lastDist
+          const newScale = Math.max(0.005, Math.min(0.5, t.scale * factor))
+          const mx = midX - rect.left
+          const my = midY - rect.top
+
+          // Zoom toward pinch center
+          t.x = mx - ((mx - t.x) / t.scale) * newScale
+          t.y = my - ((my - t.y) / t.scale) * newScale
+
+          // Also pan with the midpoint drift
+          t.x += midX - tr.lastMidX
+          t.y += midY - tr.lastMidY
+
+          t.scale = newScale
+          draw()
+          setTooltip(null)
+        }
+
+        tr.lastDist = dist
+        tr.lastMidX = midX
+        tr.lastMidY = midY
+      }
+    },
+    [draw],
+  )
+
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      const tr = touchRef.current
+
+      // If it was a single-finger tap (no drag), show tooltip
+      if (tr.touchCount === 1 && !tr.startedDrag && e.changedTouches.length === 1) {
+        const touch = e.changedTouches[0]
+        const canvas = canvasRef.current
+        if (canvas) {
+          const rect = canvas.getBoundingClientRect()
+          const cx = touch.clientX - rect.left
+          const cy = touch.clientY - rect.top
+          const hit = hitTest(cx, cy)
+          if (hit) {
+            setTooltip((prev) =>
+              prev && prev.node.id === hit.node.id ? null : { x: cx, y: cy, ...hit },
+            )
+          } else {
+            setTooltip(null)
+          }
+        }
+      }
+
+      dragRef.current.dragging = false
+      tr.touchCount = e.touches.length
+      tr.lastDist = 0
+    },
+    [hitTest],
+  )
 
   // Attach wheel listener (non-passive)
   useEffect(() => {
@@ -405,6 +557,17 @@ export function SkillTreeCanvas({ allocatedHashes, masteryEffects, className }: 
     canvas.addEventListener("wheel", handleWheel, { passive: false })
     return () => canvas.removeEventListener("wheel", handleWheel)
   }, [handleWheel])
+
+  // Prevent default touch behavior on the canvas so gestures work
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const prevent = (e: TouchEvent) => {
+      if (e.touches.length >= 2) e.preventDefault()
+    }
+    canvas.addEventListener("touchmove", prevent, { passive: false })
+    return () => canvas.removeEventListener("touchmove", prevent)
+  }, [])
 
   // Handle resize
   useEffect(() => {
@@ -440,7 +603,7 @@ export function SkillTreeCanvas({ allocatedHashes, masteryEffects, className }: 
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden rounded-lg bg-[#0c0a08] border border-border select-none ${className || ""}`}
+      className={`relative overflow-hidden rounded-lg bg-[#0c0a08] border border-border select-none touch-none ${className || ""}`}
       style={{ minHeight: 500, height: 600, cursor: dragRef.current.dragging ? "grabbing" : "grab" }}
     >
       <canvas
@@ -452,13 +615,16 @@ export function SkillTreeCanvas({ allocatedHashes, masteryEffects, className }: 
           handleMouseUp()
           setTooltip(null)
         }}
-        style={{ display: "block", width: "100%", height: "100%" }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{ display: "block", width: "100%", height: "100%", touchAction: "none" }}
       />
 
       {/* Zoom controls */}
       <div className="absolute bottom-3 right-3 flex flex-col gap-1">
         <button
-          className="w-8 h-8 bg-background/80 border border-border rounded text-sm hover:bg-accent"
+          className="w-10 h-10 md:w-8 md:h-8 bg-background/80 border border-border rounded text-sm hover:bg-accent"
           onClick={() => {
             const t = transformRef.current
             const canvas = canvasRef.current
@@ -475,7 +641,7 @@ export function SkillTreeCanvas({ allocatedHashes, masteryEffects, className }: 
           +
         </button>
         <button
-          className="w-8 h-8 bg-background/80 border border-border rounded text-sm hover:bg-accent"
+          className="w-10 h-10 md:w-8 md:h-8 bg-background/80 border border-border rounded text-sm hover:bg-accent"
           onClick={() => {
             const t = transformRef.current
             const canvas = canvasRef.current
@@ -503,7 +669,8 @@ export function SkillTreeCanvas({ allocatedHashes, masteryEffects, className }: 
           <span className="inline-block w-3 h-3 rounded-full" style={{ background: "#3a3226" }} />
           <span>Unallocated</span>
         </div>
-        <div className="text-muted-foreground mt-1">Scroll to zoom, drag to pan</div>
+        <div className="text-muted-foreground mt-1 hidden md:block">Scroll to zoom, drag to pan</div>
+        <div className="text-muted-foreground mt-1 md:hidden">Pinch to zoom, drag to pan</div>
       </div>
 
       {/* Tooltip */}
@@ -512,6 +679,7 @@ export function SkillTreeCanvas({ allocatedHashes, masteryEffects, className }: 
           node={tooltip.node}
           allocated={tooltip.allocated}
           selectedMastery={tooltip.selectedMastery}
+          jewel={tooltip.jewel}
           x={tooltip.x}
           y={tooltip.y}
           containerWidth={containerRef.current?.clientWidth || 0}
@@ -526,6 +694,7 @@ function NodeTooltip({
   node,
   allocated,
   selectedMastery,
+  jewel,
   x,
   y,
   containerWidth,
@@ -534,6 +703,7 @@ function NodeTooltip({
   node: TreeNode
   allocated: boolean
   selectedMastery?: { id: number; s: string[] }
+  jewel?: TreeJewel
   x: number
   y: number
   containerWidth: number
@@ -602,6 +772,17 @@ function NodeTooltip({
               {stat}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Jewel info */}
+      {jewel && (
+        <div className="mt-2 pt-2 border-t border-[#3a3226]">
+          <div className="text-[10px] text-muted-foreground mb-1">Socketed Jewel</div>
+          {jewel.name && (
+            <div className="text-xs font-medium text-poe-unique">{jewel.name}</div>
+          )}
+          <div className="text-[11px] text-muted-foreground">{jewel.typeLine}</div>
         </div>
       )}
 
