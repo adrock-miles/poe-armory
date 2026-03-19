@@ -36,7 +36,7 @@ const NODE_RADIUS: Record<string, number> = {
   A: 6,
 }
 
-const NODE_COLORS = {
+const NODE_COLORS: Record<string, Record<string, string>> = {
   allocated: {
     n: "#c8a84e",
     N: "#c8a84e",
