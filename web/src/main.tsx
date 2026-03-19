@@ -2,6 +2,7 @@ import React from "react"
 import ReactDOM from "react-dom/client"
 import { BrowserRouter, Routes, Route } from "react-router-dom"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { Toaster } from "sonner"
 import { Layout } from "@/components/Layout"
 import { CharacterListPage } from "@/pages/CharacterListPage"
 import { CharacterDetailPage } from "@/pages/CharacterDetailPage"
@@ -18,6 +19,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           </Route>
         </Routes>
       </BrowserRouter>
+      <Toaster theme="dark" position="bottom-right" />
     </TooltipProvider>
   </React.StrictMode>
 )

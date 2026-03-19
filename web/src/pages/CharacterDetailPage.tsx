@@ -7,7 +7,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatDate } from "@/lib/utils"
-import { ArrowLeft, Camera, Clock } from "lucide-react"
+import { ArrowLeft, Camera, Clock, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 import { GearPanel } from "@/components/GearPanel"
 import { GemsPanel } from "@/components/GemsPanel"
 import { PassiveTreePanel } from "@/components/PassiveTreePanel"
@@ -57,8 +58,9 @@ export function CharacterDetailPage() {
       setActiveSnapshot(snap)
       const snaps = await api.listSnapshots(charId)
       setSnapshots(Array.isArray(snaps) ? snaps : [])
+      toast.success("Snapshot created successfully!")
     } catch (err: any) {
-      setError(err.message)
+      toast.error(err.message || "Failed to create snapshot")
     } finally {
       setSnapshotting(false)
     }
@@ -111,7 +113,11 @@ export function CharacterDetailPage() {
           </div>
         </div>
         <Button onClick={handleSnapshot} disabled={snapshotting}>
-          <Camera className="mr-2 h-4 w-4" />
+          {snapshotting ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Camera className="mr-2 h-4 w-4" />
+          )}
           {snapshotting ? "Snapshotting..." : "Take Snapshot"}
         </Button>
       </div>
