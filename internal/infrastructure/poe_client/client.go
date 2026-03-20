@@ -278,11 +278,35 @@ func (c *Client) GetItems(ctx context.Context, accountName, characterName string
 	return items, gems, nil
 }
 
+// flexibleMap is a map[string]int that gracefully handles the PoE API returning
+// an empty JSON array [] instead of an object {} when there are no entries.
+type flexibleMap map[string]int
+
+func (m *flexibleMap) UnmarshalJSON(data []byte) error {
+	// The PoE API returns [] instead of {} when there are no mastery effects.
+	// Detect an empty or non-object JSON value and treat it as an empty map.
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "[]" || trimmed == "null" {
+		*m = make(map[string]int)
+		return nil
+	}
+	// Normal object — unmarshal into a plain map to avoid recursion.
+	var raw map[string]int
+	if err := json.Unmarshal(data, &raw); err != nil {
+		// If we still can't parse it, return an empty map rather than
+		// breaking the whole snapshot because of one field.
+		*m = make(map[string]int)
+		return nil
+	}
+	*m = raw
+	return nil
+}
+
 // poePassiveResponse is the raw response from get-passive-skills.
 type poePassiveResponse struct {
 	Hashes         []int                              `json:"hashes"`
 	HashesEx       []int                              `json:"hashes_ex"`
-	MasteryEffects map[string]int                     `json:"mastery_effects"`
+	MasteryEffects flexibleMap                        `json:"mastery_effects"`
 	Items          []json.RawMessage                  `json:"items"`
 	JewelData      map[string]poeJewelExpansionData   `json:"jewel_data"`
 }
