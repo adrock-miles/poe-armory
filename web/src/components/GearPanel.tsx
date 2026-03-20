@@ -10,7 +10,8 @@ interface Props {
 }
 
 // Paper-doll slot positions — mirrors the in-game character equipment layout
-// Grid: 7 columns x 5 rows on desktop
+// Grid: 8 columns x 4 rows on desktop.  The extra column ensures the Amulet
+// has its own space between the Body Armour and the Off Hand weapon.
 const SLOT_POSITIONS: Record<
   string,
   { col: string; row: string; label: string; iconClass: string; minH: string }
@@ -23,7 +24,7 @@ const SLOT_POSITIONS: Record<
     minH: "min-h-[120px] md:min-h-[150px]",
   },
   Offhand: {
-    col: "6 / 8",
+    col: "7 / 9",
     row: "1 / 4",
     label: "Off Hand",
     iconClass: "w-14 h-20 md:w-16 md:h-24",
@@ -37,7 +38,7 @@ const SLOT_POSITIONS: Record<
     minH: "min-h-[70px]",
   },
   BodyArmour: {
-    col: "3 / 6",
+    col: "3 / 7",
     row: "2 / 4",
     label: "Body Armour",
     iconClass: "w-12 h-16 md:w-14 md:h-20",
@@ -58,28 +59,28 @@ const SLOT_POSITIONS: Record<
     minH: "min-h-[70px]",
   },
   Boots: {
-    col: "6 / 8",
+    col: "7 / 9",
     row: "4 / 5",
     label: "Boots",
     iconClass: "w-10 h-10 md:w-12 md:h-12",
     minH: "min-h-[70px]",
   },
   Ring: {
-    col: "3 / 4",
+    col: "3 / 5",
     row: "4 / 5",
     label: "Left Ring",
     iconClass: "w-7 h-7 md:w-8 md:h-8",
     minH: "min-h-[60px]",
   },
   Ring2: {
-    col: "5 / 6",
+    col: "6 / 7",
     row: "4 / 5",
     label: "Right Ring",
     iconClass: "w-7 h-7 md:w-8 md:h-8",
     minH: "min-h-[60px]",
   },
   Belt: {
-    col: "4 / 5",
+    col: "5 / 6",
     row: "4 / 5",
     label: "Belt",
     iconClass: "w-10 h-6 md:w-12 md:h-7",
@@ -99,7 +100,17 @@ const SOCKET_COLORS: Record<string, string> = {
 export function GearPanel({ items, gems }: Props) {
   // Single popover ID — either item.id or gem.id + 100000
   const [activePopover, setActivePopover] = useState<number | null>(null)
+  // Separate hover state for desktop — shows popover on mouse-enter
+  const [hoverPopover, setHoverPopover] = useState<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // Detect touch device — if the user has touched the screen, disable hover popovers
+  const isTouchDevice = useRef(false)
+  useEffect(() => {
+    function onTouch() { isTouchDevice.current = true }
+    window.addEventListener("touchstart", onTouch, { once: true })
+    return () => window.removeEventListener("touchstart", onTouch)
+  }, [])
 
   // Group gems by item slot
   const gemsBySlot = gems.reduce<Record<string, Gem[]>>((acc, gem) => {
@@ -137,6 +148,16 @@ export function GearPanel({ items, gems }: Props) {
     [],
   )
 
+  // Hover helpers for desktop
+  const onHoverEnter = useCallback(
+    (id: number) => { if (!isTouchDevice.current) setHoverPopover(id) },
+    [],
+  )
+  const onHoverLeave = useCallback(
+    () => setHoverPopover(null),
+    [],
+  )
+
   if (items.length === 0) {
     return (
       <Card>
@@ -151,7 +172,7 @@ export function GearPanel({ items, gems }: Props) {
     <div className="space-y-4 pb-[300px] md:pb-[200px]" ref={containerRef}>
       {/* Paper-doll grid — stacks to 2-column on mobile */}
       <div className="hidden md:grid gap-2 mx-auto max-w-[700px]" style={{
-        gridTemplateColumns: "repeat(7, 1fr)",
+        gridTemplateColumns: "repeat(8, 1fr)",
         gridTemplateRows: "repeat(4, auto)",
       }}>
         {Object.entries(SLOT_POSITIONS).map(([slot, pos]) => {
@@ -169,7 +190,10 @@ export function GearPanel({ items, gems }: Props) {
               iconClass={pos.iconClass}
               minH={pos.minH}
               activePopover={activePopover}
+              hoverPopover={hoverPopover}
               toggle={toggle}
+              onHoverEnter={onHoverEnter}
+              onHoverLeave={onHoverLeave}
             />
           )
         })}
@@ -239,7 +263,10 @@ export function GearPanel({ items, gems }: Props) {
                 key={item.id}
                 item={item}
                 activePopover={activePopover}
+                hoverPopover={hoverPopover}
                 toggle={toggle}
+                onHoverEnter={onHoverEnter}
+                onHoverLeave={onHoverLeave}
               />
             ))}
           </div>
@@ -259,7 +286,10 @@ function EquipmentSlot({
   iconClass,
   minH,
   activePopover,
+  hoverPopover,
   toggle,
+  onHoverEnter,
+  onHoverLeave,
 }: {
   slot: string
   label: string
@@ -270,7 +300,10 @@ function EquipmentSlot({
   iconClass: string
   minH: string
   activePopover: number | null
+  hoverPopover?: number | null
   toggle: (id: number) => void
+  onHoverEnter?: (id: number) => void
+  onHoverLeave?: () => void
 }) {
   const borderColor = item ? frameTypeToColor(item.frameType) : "#2a2520"
 
@@ -282,13 +315,15 @@ function EquipmentSlot({
     return acc
   }, {})
 
-  const isActive = item && activePopover === item.id
+  const isActive = item && (activePopover === item.id || hoverPopover === item.id)
 
   return (
     <div
       className="relative group"
       data-slot={slot}
       style={col && row ? { gridColumn: col, gridRow: row } : undefined}
+      onMouseEnter={() => item && onHoverEnter?.(item.id)}
+      onMouseLeave={() => onHoverLeave?.()}
     >
       <div
         className={`relative flex flex-col items-center justify-center rounded-lg border bg-[#1a1612] p-1.5 h-full ${minH} cursor-pointer transition-colors hover:bg-[#252018]`}
@@ -400,17 +435,28 @@ function GemLinkGroup({
 function FlaskSlot({
   item,
   activePopover,
+  hoverPopover,
   toggle,
+  onHoverEnter,
+  onHoverLeave,
 }: {
   item: Item
   activePopover: number | null
+  hoverPopover?: number | null
   toggle: (id: number) => void
+  onHoverEnter?: (id: number) => void
+  onHoverLeave?: () => void
 }) {
   const borderColor = frameTypeToColor(item.frameType)
-  const isActive = activePopover === item.id
+  const isActive = activePopover === item.id || hoverPopover === item.id
 
   return (
-    <div className="relative" data-slot="flask">
+    <div
+      className="relative"
+      data-slot="flask"
+      onMouseEnter={() => onHoverEnter?.(item.id)}
+      onMouseLeave={() => onHoverLeave?.()}
+    >
       <div
         className="flex flex-col items-center rounded-lg border bg-[#1a1612] p-1.5 w-[60px] md:w-[72px] cursor-pointer transition-colors hover:bg-[#252018]"
         style={{ borderColor, borderWidth: "2px" }}

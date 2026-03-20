@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 
@@ -36,7 +37,7 @@ func (h *CharacterHandler) PreviewCharacters(w http.ResponseWriter, r *http.Requ
 
 	chars, err := h.svc.PreviewCharacters(r.Context(), req.AccountName)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writePoeError(w, err)
 		return
 	}
 	if chars == nil {
@@ -65,7 +66,7 @@ func (h *CharacterHandler) ImportCharacters(w http.ResponseWriter, r *http.Reque
 
 	chars, err := h.svc.ImportCharacters(r.Context(), req.AccountName, req.League, req.Characters)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writePoeError(w, err)
 		return
 	}
 
@@ -167,7 +168,7 @@ func (h *CharacterHandler) SnapshotCharacter(w http.ResponseWriter, r *http.Requ
 
 	snapshot, err := h.svc.SnapshotCharacter(r.Context(), char.AccountName, char.Name)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writePoeError(w, err)
 		return
 	}
 
@@ -212,4 +213,20 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 func writeError(w http.ResponseWriter, status int, message string) {
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
+// writePoeError inspects a PoE-API–originating error and returns an
+// appropriate HTTP status and user-friendly message.
+func writePoeError(w http.ResponseWriter, err error) {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "profile is private"):
+		writeError(w, http.StatusForbidden,
+			"This account's profile is private. The profile must be set to public on pathofexile.com before snapshots can be taken.")
+	case strings.Contains(msg, "account not found"):
+		writeError(w, http.StatusNotFound,
+			"The PoE account could not be found. Please verify the account name is correct.")
+	default:
+		writeError(w, http.StatusInternalServerError, msg)
+	}
 }
