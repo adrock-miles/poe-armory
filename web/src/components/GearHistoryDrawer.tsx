@@ -4,6 +4,8 @@ import { api } from "@/lib/api"
 import type { GearHistoryEntry } from "@/types/character"
 import { frameTypeToColor, formatDate, slotDisplayName } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { ItemModList } from "./ItemModList"
+import { SocketDots } from "./SocketDots"
 
 interface Props {
   characterId: number
@@ -204,35 +206,10 @@ function HistoryEntry({
               )}
             </div>
 
-            {item.sockets && item.sockets.length > 0 && (
-              <div className="flex gap-0.5">
-                {item.sockets.map((s, i) => (
-                  <span
-                    key={i}
-                    className={`inline-block w-2.5 h-2.5 rounded-full ${
-                      { S: "bg-red-500", D: "bg-green-500", I: "bg-blue-500", G: "bg-gray-300", A: "bg-gray-500", DV: "bg-gray-500" }[s.attr] || "bg-gray-500"
-                    }`}
-                  />
-                ))}
-              </div>
-            )}
+            <SocketDots sockets={item.sockets} size="sm" />
 
             <div className="space-y-0.5 max-h-[150px] overflow-y-auto">
-              {item.mods?.enchantMods?.map((mod, i) => (
-                <div key={`e${i}`} className="text-[10px] text-cyan-400">{mod}</div>
-              ))}
-              {item.mods?.implicitMods?.map((mod, i) => (
-                <div key={`i${i}`} className="text-[10px] text-blue-400">{mod}</div>
-              ))}
-              {item.mods?.explicitMods?.map((mod, i) => (
-                <div key={`x${i}`} className="text-[10px] text-blue-300">{mod}</div>
-              ))}
-              {item.mods?.craftedMods?.map((mod, i) => (
-                <div key={`c${i}`} className="text-[10px] text-cyan-300">{mod}</div>
-              ))}
-              {item.mods?.fracturedMods?.map((mod, i) => (
-                <div key={`f${i}`} className="text-[10px] text-amber-400">{mod}</div>
-              ))}
+              <ItemModList mods={item.mods} fontSize="xs" />
             </div>
           </div>
         )}

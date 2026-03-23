@@ -1,22 +1,54 @@
-import { useState, useCallback, useRef, useEffect } from "react"
-import type { Gem, Item, TreeJewel } from "@/types/character"
+import { useState, useCallback, useRef, useEffect, useMemo } from "react"
+import type { Gem, Item, ItemProperty, TreeJewel } from "@/types/character"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { History } from "lucide-react"
 import { frameTypeToColor } from "@/lib/utils"
 import { GearHistoryDrawer } from "./GearHistoryDrawer"
+import { ItemModList } from "./ItemModList"
+import { SocketDots, SOCKET_COLORS } from "./SocketDots"
+import { useRepositionPopover } from "@/hooks/useRepositionPopover"
 
-interface Props {
+/* ───────────────── Prop interfaces ───────────────── */
+
+interface GearPanelProps {
   items: Item[]
   gems: Gem[]
   jewels?: TreeJewel[]
   characterId?: number
 }
 
+interface SlotProps {
+  slot: string
+  label: string
+  item?: Item
+  gems: Gem[]
+  activePopover: number | null
+  toggle: (id: number) => void
+  onHistoryClick?: () => void
+}
+
+interface DesktopSlotProps extends SlotProps {
+  col: string
+  row: string
+  hoverPopover: number | null
+  onHoverEnter: (id: number) => void
+  onHoverLeave: () => void
+}
+
+interface FlaskSlotProps {
+  item: Item
+  activePopover: number | null
+  hoverPopover?: number | null
+  toggle: (id: number) => void
+  onHoverEnter?: (id: number) => void
+  onHoverLeave?: () => void
+}
+
+/* ───────────────── Module-level constants ───────────────── */
+
 // Desktop grid: 9 columns × 8 rows.
 // Each cell is 47px — the same as a PoE inventory cell.
-// Columns: [weapon 2] [gap] [centre 3] [gap] [offhand 2]
-// Rows 1-5: main equip, row 6: spacing, rows 7-8: bottom gear.
 const SLOT_POSITIONS: Record<
   string,
   { col: string; row: string; label: string }
@@ -33,16 +65,26 @@ const SLOT_POSITIONS: Record<
   Boots:      { col: "8 / 10", row: "7 / 9",  label: "Boots"     },
 }
 
-const SOCKET_COLORS: Record<string, string> = {
-  S: "bg-red-500",
-  D: "bg-green-500",
-  I: "bg-blue-500",
-  G: "bg-gray-300",
-  A: "bg-gray-500",
-  DV: "bg-gray-500",
-}
+const WEAPON_SWAP_SLOTS = new Set(["Weapon2", "Offhand2"])
 
-export function GearPanel({ items, gems, jewels, characterId }: Props) {
+const MOBILE_SLOT_ORDER = [
+  "Weapon", "Helm", "Amulet", "BodyArmour", "Offhand", "Belt", "Ring", "Ring2", "Gloves", "Boots",
+] as const
+
+const DEFENSE_PROPS = new Set([
+  "Armour", "Evasion Rating", "Energy Shield",
+  "Ward", "Block", "Chance to Block",
+])
+const WEAPON_PROPS = new Set([
+  "Physical Damage", "Elemental Damage", "Chaos Damage",
+  "Critical Strike Chance", "Attacks per Second",
+  "Weapon Range",
+])
+const DISPLAY_PROPS = new Set([...DEFENSE_PROPS, ...WEAPON_PROPS])
+
+/* ───────────────── Main component ───────────────── */
+
+export function GearPanel({ items, gems, jewels, characterId }: GearPanelProps) {
   const [activePopover, setActivePopover] = useState<number | null>(null)
   const [hoverPopover, setHoverPopover] = useState<number | null>(null)
   const [historySlot, setHistorySlot] = useState<string | null>(null)
@@ -55,23 +97,34 @@ export function GearPanel({ items, gems, jewels, characterId }: Props) {
     return () => window.removeEventListener("touchstart", onTouch)
   }, [])
 
-  // Filter out weapon swap gems
-  const WEAPON_SWAP_SLOTS = new Set(["Weapon2", "Offhand2"])
-  const displayGems = gems.filter((g) => !WEAPON_SWAP_SLOTS.has(g.itemSlot))
+  const displayGems = useMemo(
+    () => gems.filter((g) => !WEAPON_SWAP_SLOTS.has(g.itemSlot)),
+    [gems],
+  )
 
-  const gemsBySlot = displayGems.reduce<Record<string, Gem[]>>((acc, gem) => {
-    const slot = gem.itemSlot || "Unknown"
-    if (!acc[slot]) acc[slot] = []
-    acc[slot].push(gem)
-    return acc
-  }, {})
+  const gemsBySlot = useMemo(
+    () =>
+      displayGems.reduce<Record<string, Gem[]>>((acc, gem) => {
+        const slot = gem.itemSlot || "Unknown"
+        ;(acc[slot] ??= []).push(gem)
+        return acc
+      }, {}),
+    [displayGems],
+  )
 
-  const itemsBySlot = items.reduce<Record<string, Item>>((acc, item) => {
-    acc[item.slot] = item
-    return acc
-  }, {})
+  const itemsBySlot = useMemo(
+    () =>
+      items.reduce<Record<string, Item>>((acc, item) => {
+        acc[item.slot] = item
+        return acc
+      }, {}),
+    [items],
+  )
 
-  const flasks = items.filter((i) => i.slot.startsWith("Flask"))
+  const flasks = useMemo(
+    () => items.filter((i) => i.slot.startsWith("Flask")),
+    [items],
+  )
 
   useEffect(() => {
     if (activePopover === null) return
@@ -95,6 +148,11 @@ export function GearPanel({ items, gems, jewels, characterId }: Props) {
   )
   const onHoverLeave = useCallback(
     () => setHoverPopover(null),
+    [],
+  )
+
+  const openHistory = useCallback(
+    (slot: string) => setHistorySlot(slot),
     [],
   )
 
@@ -123,27 +181,23 @@ export function GearPanel({ items, gems, jewels, characterId }: Props) {
               gridTemplateRows: "47px 47px 47px 47px 47px 8px 47px 47px",
             }}
           >
-            {Object.entries(SLOT_POSITIONS).map(([slot, pos]) => {
-              const item = itemsBySlot[slot]
-              const slotGems = gemsBySlot[slot] || []
-              return (
-                <DesktopSlot
-                  key={slot}
-                  slot={slot}
-                  label={pos.label}
-                  item={item}
-                  gems={slotGems}
-                  col={pos.col}
-                  row={pos.row}
-                  activePopover={activePopover}
-                  hoverPopover={hoverPopover}
-                  toggle={toggle}
-                  onHoverEnter={onHoverEnter}
-                  onHoverLeave={onHoverLeave}
-                  onHistoryClick={characterId != null ? () => setHistorySlot(slot) : undefined}
-                />
-              )
-            })}
+            {Object.entries(SLOT_POSITIONS).map(([slot, pos]) => (
+              <DesktopSlot
+                key={slot}
+                slot={slot}
+                label={pos.label}
+                item={itemsBySlot[slot]}
+                gems={gemsBySlot[slot] || []}
+                col={pos.col}
+                row={pos.row}
+                activePopover={activePopover}
+                hoverPopover={hoverPopover}
+                toggle={toggle}
+                onHoverEnter={onHoverEnter}
+                onHoverLeave={onHoverLeave}
+                onHistoryClick={characterId != null ? () => openHistory(slot) : undefined}
+              />
+            ))}
           </div>
 
           {/* Flasks row */}
@@ -179,23 +233,18 @@ export function GearPanel({ items, gems, jewels, characterId }: Props) {
 
       {/* ── Mobile layout ── */}
       <div className="grid md:hidden grid-cols-2 gap-2">
-        {(["Weapon", "Helm", "Amulet", "BodyArmour", "Offhand", "Belt", "Ring", "Ring2", "Gloves", "Boots"] as const).map((slot) => {
-          const pos = SLOT_POSITIONS[slot]
-          const item = itemsBySlot[slot]
-          const slotGems = gemsBySlot[slot] || []
-          return (
-            <MobileSlot
-              key={slot}
-              slot={slot}
-              label={pos.label}
-              item={item}
-              gems={slotGems}
-              activePopover={activePopover}
-              toggle={toggle}
-              onHistoryClick={characterId != null ? () => setHistorySlot(slot) : undefined}
-            />
-          )
-        })}
+        {MOBILE_SLOT_ORDER.map((slot) => (
+          <MobileSlot
+            key={slot}
+            slot={slot}
+            label={SLOT_POSITIONS[slot].label}
+            item={itemsBySlot[slot]}
+            gems={gemsBySlot[slot] || []}
+            activePopover={activePopover}
+            toggle={toggle}
+            onHistoryClick={characterId != null ? () => openHistory(slot) : undefined}
+          />
+        ))}
       </div>
 
       {/* Mobile flasks */}
@@ -258,20 +307,7 @@ function DesktopSlot({
   onHoverEnter,
   onHoverLeave,
   onHistoryClick,
-}: {
-  slot: string
-  label: string
-  item?: Item
-  gems: Gem[]
-  col: string
-  row: string
-  activePopover: number | null
-  hoverPopover: number | null
-  toggle: (id: number) => void
-  onHoverEnter: (id: number) => void
-  onHoverLeave: () => void
-  onHistoryClick?: () => void
-}) {
+}: DesktopSlotProps) {
   const borderColor = item ? frameTypeToColor(item.frameType) : "#1e1b17"
   const gemGroups = groupGemsBySocket(gems)
   const isActive = item && (activePopover === item.id || hoverPopover === item.id)
@@ -297,7 +333,6 @@ function DesktopSlot({
               className="max-w-[90%] max-h-[85%] object-contain"
               loading="lazy"
             />
-            {/* Gem dots along bottom */}
             {gems.length > 0 && (
               <div className="absolute bottom-1 left-0 right-0 flex justify-center gap-0.5">
                 {Object.entries(gemGroups).map(([gIdx, gGems]) => (
@@ -340,15 +375,7 @@ function MobileSlot({
   activePopover,
   toggle,
   onHistoryClick,
-}: {
-  slot: string
-  label: string
-  item?: Item
-  gems: Gem[]
-  activePopover: number | null
-  toggle: (id: number) => void
-  onHistoryClick?: () => void
-}) {
+}: SlotProps) {
   const borderColor = item ? frameTypeToColor(item.frameType) : "#2a2520"
   const gemGroups = groupGemsBySocket(gems)
   const isActive = item && activePopover === item.id
@@ -440,30 +467,8 @@ function GemDot({
   activePopover: number | null
   toggle: (id: number) => void
 }) {
-  const tooltipRef = useRef<HTMLDivElement>(null)
   const isActive = activePopover === gemPopoverId
-
-  useEffect(() => {
-    if (!isActive) return
-    const el = tooltipRef.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    if (rect.right > window.innerWidth - 8) {
-      el.style.left = "auto"
-      el.style.right = "0"
-      el.style.transform = "none"
-    }
-    if (rect.left < 8) {
-      el.style.left = "0"
-      el.style.transform = "none"
-    }
-    if (rect.top < 8) {
-      el.style.bottom = "auto"
-      el.style.top = "100%"
-      el.style.marginBottom = "0"
-      el.style.marginTop = "4px"
-    }
-  }, [isActive])
+  const tooltipRef = useRepositionPopover<HTMLDivElement>(isActive)
 
   return (
     <div className="relative group/gem" data-slot="gem">
@@ -503,14 +508,7 @@ function FlaskSlot({
   toggle,
   onHoverEnter,
   onHoverLeave,
-}: {
-  item: Item
-  activePopover: number | null
-  hoverPopover?: number | null
-  toggle: (id: number) => void
-  onHoverEnter?: (id: number) => void
-  onHoverLeave?: () => void
-}) {
+}: FlaskSlotProps) {
   const borderColor = frameTypeToColor(item.frameType)
   const isActive = activePopover === item.id || hoverPopover === item.id
 
@@ -611,32 +609,13 @@ function ItemPopover({
         </div>
       </div>
 
-      {item.sockets && item.sockets.length > 0 && (
-        <div className="flex gap-0.5 mb-2">
-          {item.sockets.map((s, i) => (
-            <span key={i} className={`inline-block w-3 h-3 rounded-full ${SOCKET_COLORS[s.attr] || "bg-gray-500"}`} />
-          ))}
-        </div>
-      )}
+      <SocketDots sockets={item.sockets} />
+      {item.sockets && item.sockets.length > 0 && <div className="mb-2" />}
 
       <ItemProperties properties={item.properties} />
 
       <div className="space-y-0.5 mb-2 max-h-[200px] overflow-y-auto">
-        {item.mods?.enchantMods?.map((mod, i) => (
-          <div key={`e${i}`} className="text-[11px] text-cyan-400">{mod}</div>
-        ))}
-        {item.mods?.implicitMods?.map((mod, i) => (
-          <div key={`i${i}`} className="text-[11px] text-blue-400">{mod}</div>
-        ))}
-        {item.mods?.explicitMods?.map((mod, i) => (
-          <div key={`x${i}`} className="text-[11px] text-blue-300">{mod}</div>
-        ))}
-        {item.mods?.craftedMods?.map((mod, i) => (
-          <div key={`c${i}`} className="text-[11px] text-cyan-300">{mod}</div>
-        ))}
-        {item.mods?.fracturedMods?.map((mod, i) => (
-          <div key={`f${i}`} className="text-[11px] text-amber-400">{mod}</div>
-        ))}
+        <ItemModList mods={item.mods} fontSize="sm" />
       </div>
 
       {gems.length > 0 && (
@@ -676,30 +655,8 @@ function ItemPopover({
 function JewelIcon({ jewel }: { jewel: TreeJewel }) {
   const borderColor = frameTypeToColor(jewel.frameType ?? 0)
   const [showTooltip, setShowTooltip] = useState(false)
-  const tooltipRef = useRef<HTMLDivElement>(null)
+  const tooltipRef = useRepositionPopover<HTMLDivElement>(showTooltip)
   const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!showTooltip) return
-    const el = tooltipRef.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    if (rect.right > window.innerWidth - 8) {
-      el.style.left = "auto"
-      el.style.right = "0"
-      el.style.transform = "none"
-    }
-    if (rect.left < 8) {
-      el.style.left = "0"
-      el.style.transform = "none"
-    }
-    if (rect.top < 8) {
-      el.style.bottom = "auto"
-      el.style.top = "100%"
-      el.style.marginBottom = "0"
-      el.style.marginTop = "4px"
-    }
-  }, [showTooltip])
 
   useEffect(() => {
     if (!showTooltip) return
@@ -834,24 +791,12 @@ function JewelTooltip({ jewel }: { jewel: TreeJewel }) {
 function groupGemsBySocket(gems: Gem[]) {
   return gems.reduce<Record<number, Gem[]>>((acc, gem) => {
     const g = gem.socketGroup ?? 0
-    if (!acc[g]) acc[g] = []
-    acc[g].push(gem)
+    ;(acc[g] ??= []).push(gem)
     return acc
   }, {})
 }
 
-const DEFENSE_PROPS = new Set([
-  "Armour", "Evasion Rating", "Energy Shield",
-  "Ward", "Block", "Chance to Block",
-])
-const WEAPON_PROPS = new Set([
-  "Physical Damage", "Elemental Damage", "Chaos Damage",
-  "Critical Strike Chance", "Attacks per Second",
-  "Weapon Range",
-])
-const DISPLAY_PROPS = new Set([...DEFENSE_PROPS, ...WEAPON_PROPS])
-
-function ItemProperties({ properties }: { properties?: import("@/types/character").ItemProperty[] }) {
+function ItemProperties({ properties }: { properties?: ItemProperty[] }) {
   if (!properties || properties.length === 0) return null
   const shown = properties.filter((p) => DISPLAY_PROPS.has(p.name) && p.values?.length > 0)
   if (shown.length === 0) return null
