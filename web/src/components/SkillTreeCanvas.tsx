@@ -804,6 +804,9 @@ function NodeTooltip({
                 </div>
               )}
               <div className="text-[11px] text-muted-foreground">{jewel.typeLine}</div>
+              {jewel.baseType && jewel.baseType !== jewel.typeLine && (
+                <div className="text-[10px] text-muted-foreground/70">{jewel.baseType}</div>
+              )}
             </div>
           </div>
           {jewel.implicitMods && jewel.implicitMods.length > 0 && (
@@ -817,6 +820,13 @@ function NodeTooltip({
             <div className="mt-1 space-y-0.5">
               {jewel.explicitMods.map((mod, i) => (
                 <div key={`x${i}`} className="text-[11px] text-blue-300">{mod}</div>
+              ))}
+            </div>
+          )}
+          {jewel.fracturedMods && jewel.fracturedMods.length > 0 && (
+            <div className="mt-1 space-y-0.5">
+              {jewel.fracturedMods.map((mod, i) => (
+                <div key={`f${i}`} className="text-[11px] text-amber-400">{mod}</div>
               ))}
             </div>
           )}

@@ -121,6 +121,7 @@ type TreeJewel struct {
 	IconURL        string           `json:"iconUrl,omitempty"`
 	ImplicitMods   []string         `json:"implicitMods,omitempty"`
 	ExplicitMods   []string         `json:"explicitMods,omitempty"`
+	FracturedMods  []string         `json:"fracturedMods,omitempty"`
 	ClusterPassives []ClusterPassive `json:"clusterPassives,omitempty"`
 	SubJewels      []TreeJewel      `json:"subJewels,omitempty"`
 }

@@ -51,7 +51,11 @@ export function GearPanel({ items, gems, jewels }: Props) {
     return () => window.removeEventListener("touchstart", onTouch)
   }, [])
 
-  const gemsBySlot = gems.reduce<Record<string, Gem[]>>((acc, gem) => {
+  // Filter out weapon swap gems
+  const WEAPON_SWAP_SLOTS = new Set(["Weapon2", "Offhand2"])
+  const displayGems = gems.filter((g) => !WEAPON_SWAP_SLOTS.has(g.itemSlot))
+
+  const gemsBySlot = displayGems.reduce<Record<string, Gem[]>>((acc, gem) => {
     const slot = gem.itemSlot || "Unknown"
     if (!acc[slot]) acc[slot] = []
     acc[slot].push(gem)
@@ -368,34 +372,75 @@ function GemLinkGroup({
         return (
           <div key={gem.id} className="flex items-center">
             {i > 0 && <div className="w-1 h-[2px] bg-amber-600/60" />}
-            <div className="relative group/gem" data-slot="gem">
-              <div
-                className={`w-4 h-4 rounded-full border flex items-center justify-center cursor-pointer transition-transform hover:scale-125 ${
-                  gem.isSupport
-                    ? "border-blue-400/60 bg-blue-900/50"
-                    : "border-amber-400/60 bg-amber-900/50"
-                }`}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  toggle(gemPopoverId)
-                }}
-              >
-                {gem.iconUrl && (
-                  <img src={gem.iconUrl} alt={gem.name} className="w-3 h-3 object-contain" />
-                )}
-              </div>
-              <div className="hidden group-hover/gem:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 pointer-events-none">
-                <GemTooltipInner gem={gem} />
-              </div>
-              {activePopover === gemPopoverId && (
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50">
-                  <GemTooltipInner gem={gem} />
-                </div>
-              )}
-            </div>
+            <GemDot gem={gem} gemPopoverId={gemPopoverId} activePopover={activePopover} toggle={toggle} />
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function GemDot({
+  gem,
+  gemPopoverId,
+  activePopover,
+  toggle,
+}: {
+  gem: Gem
+  gemPopoverId: number
+  activePopover: number | null
+  toggle: (id: number) => void
+}) {
+  const tooltipRef = useRef<HTMLDivElement>(null)
+  const isActive = activePopover === gemPopoverId
+
+  useEffect(() => {
+    if (!isActive) return
+    const el = tooltipRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    if (rect.right > window.innerWidth - 8) {
+      el.style.left = "auto"
+      el.style.right = "0"
+      el.style.transform = "none"
+    }
+    if (rect.left < 8) {
+      el.style.left = "0"
+      el.style.transform = "none"
+    }
+    if (rect.top < 8) {
+      el.style.bottom = "auto"
+      el.style.top = "100%"
+      el.style.marginBottom = "0"
+      el.style.marginTop = "4px"
+    }
+  }, [isActive])
+
+  return (
+    <div className="relative group/gem" data-slot="gem">
+      <div
+        className={`w-4 h-4 rounded-full border flex items-center justify-center cursor-pointer transition-transform hover:scale-125 ${
+          gem.isSupport
+            ? "border-blue-400/60 bg-blue-900/50"
+            : "border-amber-400/60 bg-amber-900/50"
+        }`}
+        onClick={(e) => {
+          e.stopPropagation()
+          toggle(gemPopoverId)
+        }}
+      >
+        {gem.iconUrl && (
+          <img src={gem.iconUrl} alt={gem.name} className="w-3 h-3 object-contain" />
+        )}
+      </div>
+      <div className="hidden md:group-hover/gem:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 pointer-events-none">
+        <GemTooltipInner gem={gem} />
+      </div>
+      {isActive && (
+        <div ref={tooltipRef} className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50">
+          <GemTooltipInner gem={gem} />
+        </div>
+      )}
     </div>
   )
 }
@@ -459,6 +504,18 @@ function ItemPopover({
     const el = popoverRef.current
     if (!el) return
     const rect = el.getBoundingClientRect()
+    // On narrow screens, center the popover horizontally in the viewport
+    if (window.innerWidth < 400) {
+      el.style.position = "fixed"
+      el.style.left = "50%"
+      el.style.transform = "translateX(-50%)"
+      el.style.top = "auto"
+      el.style.bottom = "8px"
+      el.style.width = `${Math.min(280, window.innerWidth - 16)}px`
+      el.style.maxHeight = `${window.innerHeight * 0.6}px`
+      el.style.overflowY = "auto"
+      return
+    }
     if (rect.right > window.innerWidth - 8) {
       el.style.left = "auto"
       el.style.right = "0"
@@ -569,11 +626,52 @@ function ItemPopover({
 
 function JewelIcon({ jewel }: { jewel: TreeJewel }) {
   const borderColor = frameTypeToColor(jewel.frameType ?? 0)
+  const [showTooltip, setShowTooltip] = useState(false)
+  const tooltipRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!showTooltip) return
+    const el = tooltipRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    if (rect.right > window.innerWidth - 8) {
+      el.style.left = "auto"
+      el.style.right = "0"
+      el.style.transform = "none"
+    }
+    if (rect.left < 8) {
+      el.style.left = "0"
+      el.style.transform = "none"
+    }
+    if (rect.top < 8) {
+      el.style.bottom = "auto"
+      el.style.top = "100%"
+      el.style.marginBottom = "0"
+      el.style.marginTop = "4px"
+    }
+  }, [showTooltip])
+
+  useEffect(() => {
+    if (!showTooltip) return
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current?.contains(e.target as Node)) return
+      setShowTooltip(false)
+    }
+    document.addEventListener("pointerdown", handleClick)
+    return () => document.removeEventListener("pointerdown", handleClick)
+  }, [showTooltip])
 
   return (
-    <div className="relative group/jewel">
+    <div
+      ref={containerRef}
+      className="relative"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+      onClick={() => setShowTooltip((p) => !p)}
+    >
       <div
-        className="w-[40px] h-[40px] flex items-center justify-center bg-[#141210] border cursor-default transition-colors hover:bg-[#1e1a16]"
+        className="w-[40px] h-[40px] flex items-center justify-center bg-[#141210] border cursor-pointer transition-colors hover:bg-[#1e1a16]"
         style={{ borderColor, borderWidth: "2px" }}
       >
         {jewel.iconUrl ? (
@@ -582,10 +680,11 @@ function JewelIcon({ jewel }: { jewel: TreeJewel }) {
           <span className="text-[8px] text-muted-foreground/40">Jewel</span>
         )}
       </div>
-      {/* Hover popover */}
-      <div className="hidden group-hover/jewel:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 pointer-events-none">
-        <JewelTooltip jewel={jewel} />
-      </div>
+      {showTooltip && (
+        <div ref={tooltipRef} className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50">
+          <JewelTooltip jewel={jewel} />
+        </div>
+      )}
     </div>
   )
 }
@@ -605,6 +704,9 @@ function JewelTooltip({ jewel }: { jewel: TreeJewel }) {
             </div>
           )}
           <div className="text-xs text-muted-foreground">{jewel.typeLine}</div>
+          {jewel.baseType && jewel.baseType !== jewel.typeLine && (
+            <div className="text-[10px] text-muted-foreground/70">{jewel.baseType}</div>
+          )}
         </div>
       </div>
       {jewel.implicitMods && jewel.implicitMods.length > 0 && (
@@ -618,6 +720,13 @@ function JewelTooltip({ jewel }: { jewel: TreeJewel }) {
         <div className="space-y-0.5 mt-1">
           {jewel.explicitMods.map((mod, i) => (
             <div key={`x${i}`} className="text-[11px] text-blue-300">{mod}</div>
+          ))}
+        </div>
+      )}
+      {jewel.fracturedMods && jewel.fracturedMods.length > 0 && (
+        <div className="space-y-0.5 mt-1">
+          {jewel.fracturedMods.map((mod, i) => (
+            <div key={`f${i}`} className="text-[11px] text-amber-400">{mod}</div>
           ))}
         </div>
       )}
