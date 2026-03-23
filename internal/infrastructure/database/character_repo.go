@@ -108,7 +108,7 @@ func (r *SQLiteCharacterRepo) ListAccounts(ctx context.Context) ([]string, error
 
 func (r *SQLiteCharacterRepo) Upsert(ctx context.Context, char *model.Character) error {
 	now := time.Now().UTC()
-	result, err := r.db.ExecContext(ctx, `
+	_, err := r.db.ExecContext(ctx, `
 		INSERT INTO characters (account_name, name, league, class_id, class, ascendancy, level, experience, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(account_name, name) DO UPDATE SET
@@ -125,10 +125,16 @@ func (r *SQLiteCharacterRepo) Upsert(ctx context.Context, char *model.Character)
 		return fmt.Errorf("upserting character: %w", err)
 	}
 
-	id, err := result.LastInsertId()
-	if err == nil && id > 0 {
-		char.ID = id
+	// Always query back the actual ID — LastInsertId() is unreliable for
+	// ON CONFLICT DO UPDATE (SQLite doesn't update last_insert_rowid on the
+	// update path, so it returns a stale value from a previous insert).
+	err = r.db.QueryRowContext(ctx,
+		`SELECT id FROM characters WHERE account_name = ? AND name = ?`,
+		char.AccountName, char.Name).Scan(&char.ID)
+	if err != nil {
+		return fmt.Errorf("retrieving character id after upsert: %w", err)
 	}
+
 	char.UpdatedAt = now
 	return nil
 }
