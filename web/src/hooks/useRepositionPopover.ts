@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react"
+import { useEffect, useRef } from "react"
 
 /**
  * Adjusts the position of a popover element to keep it within the viewport.
@@ -6,8 +6,8 @@ import { useEffect, useRef, type RefObject } from "react"
  */
 export function useRepositionPopover<T extends HTMLElement>(
   active: boolean,
-): RefObject<T | null> {
-  const ref = useRef<T>(null)
+) {
+  const ref = useRef<T>(null!)
 
   useEffect(() => {
     if (!active) return
