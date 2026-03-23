@@ -1,5 +1,6 @@
 import { Link, Outlet } from "react-router-dom"
 import { Shield } from "lucide-react"
+import { ThemeDropdown } from "./ThemeDropdown"
 
 export function Layout() {
   return (
@@ -12,6 +13,9 @@ export function Layout() {
           </Link>
           <div className="ml-4 text-sm text-muted-foreground">
             Path of Exile Character Tracker
+          </div>
+          <div className="ml-auto">
+            <ThemeDropdown />
           </div>
         </div>
       </header>

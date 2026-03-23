@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
@@ -7,6 +7,14 @@
     <title>PoE Armory - Character Tracker</title>
   </head>
   <body>
+    <script>
+      // Apply saved theme before first paint to prevent flash
+      (function() {
+        var t = localStorage.getItem('poe-armory-theme') || 'dark';
+        document.documentElement.classList.add(t);
+        if (t !== 'light') document.documentElement.classList.add('dark');
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

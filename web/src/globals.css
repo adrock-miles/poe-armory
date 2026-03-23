@@ -47,6 +47,29 @@
     --input: 224 15% 20%;
     --ring: 35 80% 50%;
   }
+
+  /* Mirage league — ethereal indigo-teal aesthetic */
+  .mirage {
+    --background: 260 30% 7%;
+    --foreground: 220 30% 88%;
+    --card: 260 28% 10%;
+    --card-foreground: 220 30% 88%;
+    --popover: 260 28% 10%;
+    --popover-foreground: 220 30% 88%;
+    --primary: 175 70% 45%;
+    --primary-foreground: 260 30% 7%;
+    --secondary: 260 25% 16%;
+    --secondary-foreground: 220 30% 88%;
+    --muted: 260 25% 15%;
+    --muted-foreground: 240 15% 55%;
+    --accent: 270 30% 20%;
+    --accent-foreground: 220 30% 90%;
+    --destructive: 340 65% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 265 20% 20%;
+    --input: 265 20% 20%;
+    --ring: 175 70% 45%;
+  }
 }
 
 @layer base {
