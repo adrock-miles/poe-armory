@@ -1,4 +1,4 @@
-import type { Character, CharacterSnapshot } from "@/types/character"
+import type { Character, CharacterSnapshot, GearHistoryEntry } from "@/types/character"
 
 const API_BASE = "/api/v1"
 
@@ -75,5 +75,9 @@ export const api = {
 
   getSnapshot(snapshotId: number): Promise<CharacterSnapshot> {
     return fetchJSON(`/snapshots/${snapshotId}`)
+  },
+
+  getGearHistory(characterId: number, slot: string): Promise<GearHistoryEntry[]> {
+    return fetchJSON(`/characters/${characterId}/gear-history?slot=${encodeURIComponent(slot)}`)
   },
 }

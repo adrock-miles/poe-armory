@@ -1,6 +1,6 @@
+import { useMemo } from "react"
 import type { Gem, Item } from "@/types/character"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { slotDisplayName } from "@/lib/utils"
 
 interface Props {
@@ -8,64 +8,66 @@ interface Props {
   items: Item[]
 }
 
-/** A link group: the slot it lives in, the socket group index, and the gems sorted skill-first. */
 interface GemLink {
   slot: string
   socketGroup: number
   gems: Gem[]
 }
 
-/** Weapon swap slots to exclude */
 const WEAPON_SWAP_SLOTS = new Set(["Weapon2", "Offhand2"])
 
 export function ActiveSkillsSummary({ gems, items }: Props) {
-  // Filter out weapon swap gems
-  const filteredGems = gems.filter((g) => !WEAPON_SWAP_SLOTS.has(g.itemSlot))
+  const filteredGems = useMemo(
+    () => gems.filter((g) => !WEAPON_SWAP_SLOTS.has(g.itemSlot)),
+    [gems],
+  )
+
+  const itemBySlot = useMemo(
+    () => {
+      const map: Record<string, Item> = {}
+      for (const item of items) map[item.slot] = item
+      return map
+    },
+    [items],
+  )
+
+  const { links, totalActive, totalSupport } = useMemo(() => {
+    const linkMap = new Map<string, GemLink>()
+    for (const gem of filteredGems) {
+      const key = `${gem.itemSlot}::${gem.socketGroup}`
+      if (!linkMap.has(key)) {
+        linkMap.set(key, { slot: gem.itemSlot, socketGroup: gem.socketGroup, gems: [] })
+      }
+      linkMap.get(key)!.gems.push(gem)
+    }
+
+    const result = Array.from(linkMap.values())
+    for (const link of result) {
+      link.gems.sort((a, b) => (a.isSupport === b.isSupport ? 0 : a.isSupport ? 1 : -1))
+    }
+
+    const maxLinkBySlot = new Map<string, number>()
+    for (const link of result) {
+      const cur = maxLinkBySlot.get(link.slot) || 0
+      maxLinkBySlot.set(link.slot, Math.max(cur, link.gems.length))
+    }
+
+    result.sort((a, b) => {
+      const aSlotMax = maxLinkBySlot.get(a.slot) || 0
+      const bSlotMax = maxLinkBySlot.get(b.slot) || 0
+      if (aSlotMax !== bSlotMax) return bSlotMax - aSlotMax
+      if (a.slot !== b.slot) return a.slot.localeCompare(b.slot)
+      return b.gems.length - a.gems.length
+    })
+
+    return {
+      links: result,
+      totalActive: filteredGems.filter((g) => !g.isSupport).length,
+      totalSupport: filteredGems.filter((g) => g.isSupport).length,
+    }
+  }, [filteredGems])
 
   if (filteredGems.length === 0) return null
-
-  // Build a lookup of item name by slot
-  const itemBySlot: Record<string, Item> = {}
-  for (const item of items) {
-    itemBySlot[item.slot] = item
-  }
-
-  // Group gems by slot + socketGroup
-  const linkMap = new Map<string, GemLink>()
-  for (const gem of filteredGems) {
-    const key = `${gem.itemSlot}::${gem.socketGroup}`
-    if (!linkMap.has(key)) {
-      linkMap.set(key, { slot: gem.itemSlot, socketGroup: gem.socketGroup, gems: [] })
-    }
-    linkMap.get(key)!.gems.push(gem)
-  }
-
-  // Sort each link: active skills first, then supports
-  const links = Array.from(linkMap.values())
-  for (const link of links) {
-    link.gems.sort((a, b) => (a.isSupport === b.isSupport ? 0 : a.isSupport ? 1 : -1))
-  }
-
-  // Sort links: highest gem count first, but keep links from the same item slot together
-  // First, find the max link size per slot
-  const maxLinkBySlot = new Map<string, number>()
-  for (const link of links) {
-    const cur = maxLinkBySlot.get(link.slot) || 0
-    maxLinkBySlot.set(link.slot, Math.max(cur, link.gems.length))
-  }
-
-  links.sort((a, b) => {
-    // Primary: slots with the biggest link come first
-    const aSlotMax = maxLinkBySlot.get(a.slot) || 0
-    const bSlotMax = maxLinkBySlot.get(b.slot) || 0
-    if (aSlotMax !== bSlotMax) return bSlotMax - aSlotMax
-    // Secondary: keep same slot together, then biggest link within slot first
-    if (a.slot !== b.slot) return a.slot.localeCompare(b.slot)
-    return b.gems.length - a.gems.length
-  })
-
-  const totalActive = filteredGems.filter((g) => !g.isSupport).length
-  const totalSupport = filteredGems.filter((g) => g.isSupport).length
 
   return (
     <Card>
@@ -80,7 +82,6 @@ export function ActiveSkillsSummary({ gems, items }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {links.map((link) => {
             const item = itemBySlot[link.slot]
-            const activeGem = link.gems.find((g) => !g.isSupport)
             return (
               <div
                 key={`${link.slot}-${link.socketGroup}`}

@@ -71,6 +71,7 @@ func New(cfg *config.Config) (*App, error) {
 	api.HandleFunc("/characters/{id:[0-9]+}/snapshot", h.SnapshotCharacter).Methods("POST")
 	api.HandleFunc("/characters/{id:[0-9]+}/snapshots", h.ListSnapshots).Methods("GET")
 	api.HandleFunc("/characters/{id:[0-9]+}/snapshots/latest", h.GetLatestSnapshot).Methods("GET")
+	api.HandleFunc("/characters/{id:[0-9]+}/gear-history", h.GetGearHistory).Methods("GET")
 	api.HandleFunc("/snapshots/{id:[0-9]+}", h.GetSnapshot).Methods("GET")
 
 	// Serve frontend (SPA with fallback to index.html)

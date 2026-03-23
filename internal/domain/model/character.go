@@ -139,6 +139,15 @@ type CharacterInfo struct {
 	Experience int64
 }
 
+// GearHistoryEntry represents a unique item that appeared in a gear slot,
+// along with the snapshot window during which it was equipped.
+type GearHistoryEntry struct {
+	Item       Item      `json:"item"`
+	FirstSeenAt time.Time `json:"firstSeenAt"`
+	LastSeenAt  time.Time `json:"lastSeenAt"`
+	SnapshotCount int    `json:"snapshotCount"`
+}
+
 // AscendancyInfo holds parsed ascendancy data.
 type AscendancyInfo struct {
 	ClassName       string   `json:"className"`

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Link } from "react-router-dom"
 import { api } from "@/lib/api"
 import type { Character } from "@/types/character"
@@ -9,6 +9,22 @@ import { Badge } from "@/components/ui/badge"
 import { formatDate } from "@/lib/utils"
 import { Download, Camera, Trash2, Search, Filter, Users, X, CheckSquare, Square, Loader2 } from "lucide-react"
 import { toast } from "sonner"
+
+const CLASS_COLORS: Record<string, string> = {
+  Marauder: "bg-red-900/50 text-red-300",
+  Witch: "bg-purple-900/50 text-purple-300",
+  Ranger: "bg-green-900/50 text-green-300",
+  Duelist: "bg-yellow-900/50 text-yellow-300",
+  Templar: "bg-blue-900/50 text-blue-300",
+  Shadow: "bg-indigo-900/50 text-indigo-300",
+  Scion: "bg-gray-700/50 text-gray-300",
+}
+
+function sortLeagues(a: string, b: string): number {
+  if (a === "Standard") return 1
+  if (b === "Standard") return -1
+  return a.localeCompare(b)
+}
 
 export function CharacterListPage() {
   const [characters, setCharacters] = useState<Character[]>([])
@@ -205,37 +221,31 @@ export function CharacterListPage() {
   }
 
   // Group characters by league
-  const charsByLeague = characters.reduce<Record<string, Character[]>>((acc, char) => {
-    const league = char.league || "Standard"
-    if (!acc[league]) acc[league] = []
-    acc[league].push(char)
-    return acc
-  }, {})
+  const charsByLeague = useMemo(
+    () =>
+      characters.reduce<Record<string, Character[]>>((acc, char) => {
+        const league = char.league || "Standard"
+        ;(acc[league] ??= []).push(char)
+        return acc
+      }, {}),
+    [characters],
+  )
 
-  // Sort leagues: current leagues first, then Standard
-  const leagueOrder = Object.keys(charsByLeague).sort((a, b) => {
-    if (a === "Standard") return 1
-    if (b === "Standard") return -1
-    return a.localeCompare(b)
-  })
+  const leagueOrder = useMemo(
+    () => Object.keys(charsByLeague).sort(sortLeagues),
+    [charsByLeague],
+  )
 
-  const classColors: Record<string, string> = {
-    Marauder: "bg-red-900/50 text-red-300",
-    Witch: "bg-purple-900/50 text-purple-300",
-    Ranger: "bg-green-900/50 text-green-300",
-    Duelist: "bg-yellow-900/50 text-yellow-300",
-    Templar: "bg-blue-900/50 text-blue-300",
-    Shadow: "bg-indigo-900/50 text-indigo-300",
-    Scion: "bg-gray-700/50 text-gray-300",
-  }
+  const previewLeagueList = useMemo(
+    () =>
+      [...new Set(previewChars.map((c) => c.league).filter(Boolean))].sort(sortLeagues),
+    [previewChars],
+  )
 
-  // Preview leagues
-  const previewLeagues = [...new Set(previewChars.map((c) => c.league).filter(Boolean))].sort((a, b) => {
-    if (a === "Standard") return 1
-    if (b === "Standard") return -1
-    return a.localeCompare(b)
-  })
-  const previewInLeague = previewChars.filter((c) => c.league === previewLeague)
+  const previewInLeague = useMemo(
+    () => previewChars.filter((c) => c.league === previewLeague),
+    [previewChars, previewLeague],
+  )
 
   return (
     <div className="space-y-6">
@@ -276,7 +286,7 @@ export function CharacterListPage() {
               {/* League selector */}
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="text-sm font-medium">League:</span>
-                {previewLeagues.map((l) => (
+                {previewLeagueList.map((l) => (
                   <Button
                     key={l}
                     variant={previewLeague === l ? "default" : "outline"}
@@ -324,7 +334,7 @@ export function CharacterListPage() {
                           className="rounded"
                         />
                         <span className="font-medium text-sm">{char.name}</span>
-                        <Badge variant="outline" className={`text-xs ${classColors[char.class] || ""}`}>
+                        <Badge variant="outline" className={`text-xs ${CLASS_COLORS[char.class] || ""}`}>
                           {char.ascendancy || char.class}
                         </Badge>
                         <span className="font-mono text-xs">Lv {char.level}</span>
@@ -486,7 +496,7 @@ export function CharacterListPage() {
                               <span className="text-xs text-muted-foreground">{char.accountName}</span>
                             </div>
                           </div>
-                          <Badge variant="outline" className={classColors[char.class] || ""}>
+                          <Badge variant="outline" className={CLASS_COLORS[char.class] || ""}>
                             {char.ascendancy || char.class}
                           </Badge>
                           <span className="font-mono text-sm">Lv {char.level}</span>

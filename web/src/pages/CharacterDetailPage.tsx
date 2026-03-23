@@ -139,7 +139,7 @@ export function CharacterDetailPage() {
       {/* Content — single overview: equipment, skills, passive tree */}
       {activeSnapshot ? (
         <div className="space-y-6">
-          <GearPanel items={activeSnapshot.items || []} gems={activeSnapshot.gems || []} jewels={activeSnapshot.passiveTree?.jewels} />
+          <GearPanel items={activeSnapshot.items || []} gems={activeSnapshot.gems || []} jewels={activeSnapshot.passiveTree?.jewels} characterId={charId} />
 
           <ActiveSkillsSummary gems={activeSnapshot.gems || []} items={activeSnapshot.items || []} />
 

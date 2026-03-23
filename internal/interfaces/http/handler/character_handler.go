@@ -195,6 +195,25 @@ func (h *CharacterHandler) GetLatestSnapshot(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusOK, snapshot)
 }
 
+func (h *CharacterHandler) GetGearHistory(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
+	slot := r.URL.Query().Get("slot")
+	if slot == "" {
+		writeError(w, http.StatusBadRequest, "slot query parameter is required")
+		return
+	}
+
+	history, err := h.svc.GetGearHistory(r.Context(), id, slot)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if history == nil {
+		history = []model.GearHistoryEntry{}
+	}
+	writeJSON(w, http.StatusOK, history)
+}
+
 func (h *CharacterHandler) GetSnapshot(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
 	snapshot, err := h.svc.GetSnapshot(r.Context(), id)
