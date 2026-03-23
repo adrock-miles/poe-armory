@@ -26,4 +26,5 @@ type SnapshotRepository interface {
 	ListByCharacterID(ctx context.Context, characterID int64) ([]model.CharacterSnapshot, error)
 	GetLatestByCharacterID(ctx context.Context, characterID int64) (*model.CharacterSnapshot, error)
 	Delete(ctx context.Context, id int64) error
+	GetGearHistory(ctx context.Context, characterID int64, slot string) ([]model.GearHistoryEntry, error)
 }

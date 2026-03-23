@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/poe-armory/poe-armory/internal/domain/model"
 )
@@ -147,6 +148,132 @@ func (r *SQLiteSnapshotRepo) GetLatestByCharacterID(ctx context.Context, charact
 func (r *SQLiteSnapshotRepo) Delete(ctx context.Context, id int64) error {
 	_, err := r.db.ExecContext(ctx, `DELETE FROM snapshots WHERE id = ?`, id)
 	return err
+}
+
+func (r *SQLiteSnapshotRepo) GetGearHistory(ctx context.Context, characterID int64, slot string) ([]model.GearHistoryEntry, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT i.id, i.snapshot_id, i.name, i.type_line, i.base_type, i.frame_type,
+		       i.slot, i.icon_url, i.ilvl, i.identified, i.corrupted, i.raw_json,
+		       s.snapshot_at
+		FROM items i
+		JOIN snapshots s ON s.id = i.snapshot_id
+		WHERE s.character_id = ? AND i.slot = ?
+		ORDER BY s.snapshot_at ASC`, characterID, slot)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type itemRow struct {
+		item       model.Item
+		snapshotAt time.Time
+	}
+
+	var allRows []itemRow
+	for rows.Next() {
+		var ir itemRow
+		if err := rows.Scan(&ir.item.ID, &ir.item.SnapshotID, &ir.item.Name, &ir.item.TypeLine,
+			&ir.item.BaseType, &ir.item.FrameType, &ir.item.Slot, &ir.item.IconURL,
+			&ir.item.Ilvl, &ir.item.Identified, &ir.item.Corrupted, &ir.item.RawJSON,
+			&ir.snapshotAt); err != nil {
+			return nil, err
+		}
+		// Parse mods and sockets from raw JSON
+		if ir.item.RawJSON != "" && ir.item.RawJSON != "{}" {
+			var raw map[string]json.RawMessage
+			if err := json.Unmarshal([]byte(ir.item.RawJSON), &raw); err == nil {
+				if v, ok := raw["implicitMods"]; ok {
+					json.Unmarshal(v, &ir.item.Mods.Implicit)
+				}
+				if v, ok := raw["explicitMods"]; ok {
+					json.Unmarshal(v, &ir.item.Mods.Explicit)
+				}
+				if v, ok := raw["craftedMods"]; ok {
+					json.Unmarshal(v, &ir.item.Mods.Crafted)
+				}
+				if v, ok := raw["enchantMods"]; ok {
+					json.Unmarshal(v, &ir.item.Mods.Enchant)
+				}
+				if v, ok := raw["fracturedMods"]; ok {
+					json.Unmarshal(v, &ir.item.Mods.Fractured)
+				}
+				if v, ok := raw["sockets"]; ok {
+					json.Unmarshal(v, &ir.item.Sockets)
+				}
+				if v, ok := raw["properties"]; ok {
+					json.Unmarshal(v, &ir.item.Properties)
+				}
+			}
+		}
+		allRows = append(allRows, ir)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Deduplicate: only create a new entry when the item fingerprint changes.
+	var history []model.GearHistoryEntry
+	for _, ir := range allRows {
+		fp := itemFingerprint(ir.item)
+		if len(history) > 0 && fp == itemFingerprint(history[len(history)-1].Item) {
+			// Same item as previous entry — extend its window.
+			history[len(history)-1].LastSeenAt = ir.snapshotAt
+			history[len(history)-1].SnapshotCount++
+		} else {
+			history = append(history, model.GearHistoryEntry{
+				Item:          ir.item,
+				FirstSeenAt:   ir.snapshotAt,
+				LastSeenAt:    ir.snapshotAt,
+				SnapshotCount: 1,
+			})
+		}
+	}
+
+	// Reverse so newest is first.
+	for i, j := 0, len(history)-1; i < j; i, j = i+1, j-1 {
+		history[i], history[j] = history[j], history[i]
+	}
+
+	return history, nil
+}
+
+// itemFingerprint produces a comparable string that uniquely identifies an item's
+// "identity" — same name, base, rarity, corruption, and mod set means same item.
+func itemFingerprint(item model.Item) string {
+	parts := []string{
+		item.Name,
+		item.TypeLine,
+		item.BaseType,
+		fmt.Sprintf("%d", item.FrameType),
+		fmt.Sprintf("%v", item.Corrupted),
+		fmt.Sprintf("%d", item.Ilvl),
+	}
+	// Include mods so re-crafted / modified items show as different entries.
+	appendMods := func(mods []string) {
+		sorted := make([]string, len(mods))
+		copy(sorted, mods)
+		for i := 0; i < len(sorted); i++ {
+			for j := i + 1; j < len(sorted); j++ {
+				if sorted[i] > sorted[j] {
+					sorted[i], sorted[j] = sorted[j], sorted[i]
+				}
+			}
+		}
+		for _, m := range sorted {
+			parts = append(parts, m)
+		}
+	}
+	appendMods(item.Mods.Implicit)
+	appendMods(item.Mods.Explicit)
+	appendMods(item.Mods.Crafted)
+	appendMods(item.Mods.Enchant)
+	appendMods(item.Mods.Fractured)
+
+	result := ""
+	for _, p := range parts {
+		result += p + "|"
+	}
+	return result
 }
 
 func (r *SQLiteSnapshotRepo) loadSnapshotRelations(ctx context.Context, snapshot *model.CharacterSnapshot) error {

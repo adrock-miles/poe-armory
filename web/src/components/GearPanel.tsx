@@ -2,12 +2,15 @@ import { useState, useCallback, useRef, useEffect } from "react"
 import type { Gem, Item, TreeJewel } from "@/types/character"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { History } from "lucide-react"
 import { frameTypeToColor } from "@/lib/utils"
+import { GearHistoryDrawer } from "./GearHistoryDrawer"
 
 interface Props {
   items: Item[]
   gems: Gem[]
   jewels?: TreeJewel[]
+  characterId?: number
 }
 
 // Desktop grid: 9 columns × 8 rows.
@@ -39,9 +42,10 @@ const SOCKET_COLORS: Record<string, string> = {
   DV: "bg-gray-500",
 }
 
-export function GearPanel({ items, gems, jewels }: Props) {
+export function GearPanel({ items, gems, jewels, characterId }: Props) {
   const [activePopover, setActivePopover] = useState<number | null>(null)
   const [hoverPopover, setHoverPopover] = useState<number | null>(null)
+  const [historySlot, setHistorySlot] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const isTouchDevice = useRef(false)
@@ -136,6 +140,7 @@ export function GearPanel({ items, gems, jewels }: Props) {
                   toggle={toggle}
                   onHoverEnter={onHoverEnter}
                   onHoverLeave={onHoverLeave}
+                  onHistoryClick={characterId != null ? () => setHistorySlot(slot) : undefined}
                 />
               )
             })}
@@ -187,6 +192,7 @@ export function GearPanel({ items, gems, jewels }: Props) {
               gems={slotGems}
               activePopover={activePopover}
               toggle={toggle}
+              onHistoryClick={characterId != null ? () => setHistorySlot(slot) : undefined}
             />
           )
         })}
@@ -223,6 +229,16 @@ export function GearPanel({ items, gems, jewels }: Props) {
           </div>
         </div>
       )}
+
+      {/* Gear history drawer */}
+      {characterId != null && (
+        <GearHistoryDrawer
+          characterId={characterId}
+          slot={historySlot || ""}
+          open={historySlot !== null}
+          onClose={() => setHistorySlot(null)}
+        />
+      )}
     </div>
   )
 }
@@ -241,6 +257,7 @@ function DesktopSlot({
   toggle,
   onHoverEnter,
   onHoverLeave,
+  onHistoryClick,
 }: {
   slot: string
   label: string
@@ -253,6 +270,7 @@ function DesktopSlot({
   toggle: (id: number) => void
   onHoverEnter: (id: number) => void
   onHoverLeave: () => void
+  onHistoryClick?: () => void
 }) {
   const borderColor = item ? frameTypeToColor(item.frameType) : "#1e1b17"
   const gemGroups = groupGemsBySocket(gems)
@@ -260,7 +278,7 @@ function DesktopSlot({
 
   return (
     <div
-      className="relative"
+      className="relative group/slot"
       data-slot={slot}
       style={{ gridColumn: col, gridRow: row }}
       onMouseEnter={() => item && onHoverEnter(item.id)}
@@ -293,6 +311,20 @@ function DesktopSlot({
         )}
       </div>
 
+      {/* History icon — appears on hover */}
+      {onHistoryClick && (
+        <button
+          className="absolute -top-1 -right-1 z-10 w-5 h-5 rounded-full bg-[#1a1612] border border-[#3a3226] flex items-center justify-center opacity-0 group-hover/slot:opacity-100 transition-opacity hover:bg-[#2a2520] hover:border-[#5a5246]"
+          onClick={(e) => {
+            e.stopPropagation()
+            onHistoryClick()
+          }}
+          title="View slot history"
+        >
+          <History className="w-2.5 h-2.5 text-muted-foreground" />
+        </button>
+      )}
+
       {isActive && item && <ItemPopover item={item} gems={gems} gemGroups={gemGroups} />}
     </div>
   )
@@ -307,6 +339,7 @@ function MobileSlot({
   gems,
   activePopover,
   toggle,
+  onHistoryClick,
 }: {
   slot: string
   label: string
@@ -314,6 +347,7 @@ function MobileSlot({
   gems: Gem[]
   activePopover: number | null
   toggle: (id: number) => void
+  onHistoryClick?: () => void
 }) {
   const borderColor = item ? frameTypeToColor(item.frameType) : "#2a2520"
   const gemGroups = groupGemsBySocket(gems)
@@ -349,6 +383,21 @@ function MobileSlot({
           <div className="text-muted-foreground/30 text-xs">Empty</div>
         )}
       </div>
+
+      {/* History icon — mobile */}
+      {onHistoryClick && (
+        <button
+          className="absolute -top-1.5 -right-1.5 z-10 w-6 h-6 rounded-full bg-[#1a1612] border border-[#3a3226] flex items-center justify-center hover:bg-[#2a2520] hover:border-[#5a5246] transition-colors"
+          onClick={(e) => {
+            e.stopPropagation()
+            onHistoryClick()
+          }}
+          title="View slot history"
+        >
+          <History className="w-3 h-3 text-muted-foreground" />
+        </button>
+      )}
+
       {isActive && item && <ItemPopover item={item} gems={gems} gemGroups={gemGroups} />}
     </div>
   )

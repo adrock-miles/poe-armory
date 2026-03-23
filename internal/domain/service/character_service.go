@@ -165,6 +165,11 @@ func (s *CharacterService) GetLatestSnapshot(ctx context.Context, characterID in
 	return s.snapshotRepo.GetLatestByCharacterID(ctx, characterID)
 }
 
+// GetGearHistory returns the deduplicated item history for a given slot.
+func (s *CharacterService) GetGearHistory(ctx context.Context, characterID int64, slot string) ([]model.GearHistoryEntry, error) {
+	return s.snapshotRepo.GetGearHistory(ctx, characterID, slot)
+}
+
 // DeleteCharacter removes a character and its data.
 func (s *CharacterService) DeleteCharacter(ctx context.Context, id int64) error {
 	return s.charRepo.Delete(ctx, id)

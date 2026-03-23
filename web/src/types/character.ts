@@ -102,6 +102,13 @@ export interface TreeJewel {
   subJewels?: TreeJewel[]
 }
 
+export interface GearHistoryEntry {
+  item: Item
+  firstSeenAt: string
+  lastSeenAt: string
+  snapshotCount: number
+}
+
 export interface ClusterPassive {
   name: string
   stats?: string[]
