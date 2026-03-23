@@ -15,8 +15,14 @@ interface GemLink {
   gems: Gem[]
 }
 
+/** Weapon swap slots to exclude */
+const WEAPON_SWAP_SLOTS = new Set(["Weapon2", "Offhand2"])
+
 export function ActiveSkillsSummary({ gems, items }: Props) {
-  if (gems.length === 0) return null
+  // Filter out weapon swap gems
+  const filteredGems = gems.filter((g) => !WEAPON_SWAP_SLOTS.has(g.itemSlot))
+
+  if (filteredGems.length === 0) return null
 
   // Build a lookup of item name by slot
   const itemBySlot: Record<string, Item> = {}
@@ -26,7 +32,7 @@ export function ActiveSkillsSummary({ gems, items }: Props) {
 
   // Group gems by slot + socketGroup
   const linkMap = new Map<string, GemLink>()
-  for (const gem of gems) {
+  for (const gem of filteredGems) {
     const key = `${gem.itemSlot}::${gem.socketGroup}`
     if (!linkMap.has(key)) {
       linkMap.set(key, { slot: gem.itemSlot, socketGroup: gem.socketGroup, gems: [] })
@@ -40,15 +46,26 @@ export function ActiveSkillsSummary({ gems, items }: Props) {
     link.gems.sort((a, b) => (a.isSupport === b.isSupport ? 0 : a.isSupport ? 1 : -1))
   }
 
-  // Sort links so those with an active skill come first
+  // Sort links: highest gem count first, but keep links from the same item slot together
+  // First, find the max link size per slot
+  const maxLinkBySlot = new Map<string, number>()
+  for (const link of links) {
+    const cur = maxLinkBySlot.get(link.slot) || 0
+    maxLinkBySlot.set(link.slot, Math.max(cur, link.gems.length))
+  }
+
   links.sort((a, b) => {
-    const aHasActive = a.gems.some((g) => !g.isSupport) ? 0 : 1
-    const bHasActive = b.gems.some((g) => !g.isSupport) ? 0 : 1
-    return aHasActive - bHasActive
+    // Primary: slots with the biggest link come first
+    const aSlotMax = maxLinkBySlot.get(a.slot) || 0
+    const bSlotMax = maxLinkBySlot.get(b.slot) || 0
+    if (aSlotMax !== bSlotMax) return bSlotMax - aSlotMax
+    // Secondary: keep same slot together, then biggest link within slot first
+    if (a.slot !== b.slot) return a.slot.localeCompare(b.slot)
+    return b.gems.length - a.gems.length
   })
 
-  const totalActive = gems.filter((g) => !g.isSupport).length
-  const totalSupport = gems.filter((g) => g.isSupport).length
+  const totalActive = filteredGems.filter((g) => !g.isSupport).length
+  const totalSupport = filteredGems.filter((g) => g.isSupport).length
 
   return (
     <Card>

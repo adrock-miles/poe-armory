@@ -97,6 +97,7 @@ export interface TreeJewel {
   iconUrl?: string
   implicitMods?: string[]
   explicitMods?: string[]
+  fracturedMods?: string[]
   clusterPassives?: ClusterPassive[]
   subJewels?: TreeJewel[]
 }
