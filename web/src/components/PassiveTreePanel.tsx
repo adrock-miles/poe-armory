@@ -3,7 +3,6 @@ import type { PassiveTree } from "@/types/character"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { SkillTreeCanvas } from "@/components/SkillTreeCanvas"
-import { frameTypeToColor } from "@/lib/utils"
 
 interface Props {
   tree: PassiveTree | null
@@ -22,7 +21,6 @@ export function PassiveTreePanel({ tree }: Props) {
 
   const totalNodes = tree.hashes?.length ?? 0
   const masteryCount = tree.masteries?.length ?? 0
-  const jewelCount = tree.jewels?.length ?? 0
   const keystoneCount = tree.keystones?.length ?? 0
 
   const allocatedHashes = useMemo(
@@ -41,13 +39,26 @@ export function PassiveTreePanel({ tree }: Props) {
   }, [tree.masteries])
 
   return (
-    <div className="space-y-4">
-      {/* Stats Overview */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Allocated Nodes" value={totalNodes} />
-        <StatCard label="Masteries" value={masteryCount} />
-        <StatCard label="Keystones" value={keystoneCount} />
-        <StatCard label="Jewels" value={jewelCount} />
+    <div className="space-y-2">
+      {/* Inline stats + keystones */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground px-1">
+        <span><span className="font-medium text-foreground">{totalNodes}</span> nodes</span>
+        {masteryCount > 0 && (
+          <span><span className="font-medium text-foreground">{masteryCount}</span> masteries</span>
+        )}
+        {keystoneCount > 0 && (
+          <span><span className="font-medium text-foreground">{keystoneCount}</span> keystones</span>
+        )}
+        {tree.keystones && tree.keystones.length > 0 && (
+          <>
+            <span className="text-muted-foreground/40">|</span>
+            {tree.keystones.map((ks, i) => (
+              <Badge key={i} variant="outline" className="text-xs text-amber-400 border-amber-400/30">
+                {ks}
+              </Badge>
+            ))}
+          </>
+        )}
       </div>
 
       {/* Interactive Skill Tree */}
@@ -56,153 +67,6 @@ export function PassiveTreePanel({ tree }: Props) {
         masteryEffects={masteryEffects}
         jewels={tree.jewels}
       />
-
-      {/* Keystones */}
-      {tree.keystones && tree.keystones.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Keystones</h3>
-            <div className="flex flex-wrap gap-2">
-              {tree.keystones.map((ks, i) => (
-                <Badge key={i} variant="outline" className="text-sm text-amber-400 border-amber-400/30">
-                  {ks}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Masteries */}
-      {tree.masteries && tree.masteries.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Masteries</h3>
-            <div className="space-y-2">
-              {tree.masteries.map((m, i) => (
-                <div key={i} className="flex items-start gap-2 py-1">
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 mt-0.5 flex-shrink-0">
-                    #{m.nodeHash}
-                  </Badge>
-                  <span className="text-sm text-blue-300">
-                    {m.effect || `Effect #${m.effectHash}`}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Jewels */}
-      {tree.jewels && tree.jewels.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Tree Jewels</h3>
-            <div className="space-y-3">
-              {tree.jewels.map((j, i) => (
-                <div key={i} className="flex items-start gap-3 py-1">
-                  {j.iconUrl && (
-                    <img src={j.iconUrl} alt={j.name || j.typeLine} className="w-10 h-10 object-contain flex-shrink-0" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    {j.name && (
-                      <div
-                        className="text-sm font-medium truncate"
-                        style={{ color: frameTypeToColor(j.frameType ?? 0) }}
-                      >
-                        {j.name}
-                      </div>
-                    )}
-                    <div className="text-xs text-muted-foreground">{j.typeLine}</div>
-                    {j.implicitMods && j.implicitMods.length > 0 && (
-                      <div className="mt-1 space-y-0.5">
-                        {j.implicitMods.map((mod, mi) => (
-                          <div key={`i${mi}`} className="text-[11px] text-blue-400">{mod}</div>
-                        ))}
-                      </div>
-                    )}
-                    {j.explicitMods && j.explicitMods.length > 0 && (
-                      <div className="mt-1 space-y-0.5">
-                        {j.explicitMods.map((mod, mi) => (
-                          <div key={`x${mi}`} className="text-[11px] text-blue-300">{mod}</div>
-                        ))}
-                      </div>
-                    )}
-                    {/* Cluster expansion passives */}
-                    {j.clusterPassives && j.clusterPassives.length > 0 && (
-                      <div className="mt-2 pt-1 border-t border-border/50">
-                        <div className="text-[10px] text-muted-foreground mb-1">Cluster Passives</div>
-                        <div className="space-y-1">
-                          {j.clusterPassives.filter(p => p.type !== "socket").map((p, pi) => (
-                            <div key={pi}>
-                              <span className={`text-xs ${p.type === "notable" ? "text-amber-300 font-medium" : "text-gray-300"}`}>
-                                {p.name}
-                              </span>
-                              {p.stats && p.stats.length > 0 && (
-                                <div className="ml-2">
-                                  {p.stats.map((s, si) => (
-                                    <div key={si} className="text-[11px] text-blue-300">{s}</div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {/* Sub-jewels socketed in this cluster jewel */}
-                    {j.subJewels && j.subJewels.length > 0 && (
-                      <div className="mt-2 pt-1 border-t border-border/50">
-                        <div className="text-[10px] text-muted-foreground mb-1">Socketed Jewels</div>
-                        {j.subJewels.map((sj, si) => (
-                          <div key={si} className="flex items-start gap-2 mt-1">
-                            {sj.iconUrl && (
-                              <img src={sj.iconUrl} alt={sj.name || sj.typeLine} className="w-8 h-8 object-contain flex-shrink-0" />
-                            )}
-                            <div className="min-w-0">
-                              {sj.name && (
-                                <div
-                                  className="text-xs font-medium truncate"
-                                  style={{ color: frameTypeToColor(sj.frameType ?? 0) }}
-                                >
-                                  {sj.name}
-                                </div>
-                              )}
-                              <div className="text-[11px] text-muted-foreground">{sj.typeLine}</div>
-                              {sj.explicitMods && sj.explicitMods.length > 0 && (
-                                <div className="mt-0.5 space-y-0.5">
-                                  {sj.explicitMods.map((mod, mi) => (
-                                    <div key={mi} className="text-[11px] text-blue-300">{mod}</div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <Badge variant="outline" className="text-[10px] flex-shrink-0">
-                    Node {j.nodeHash}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
-  )
-}
-
-function StatCard({ label, value }: { label: string; value: number }) {
-  return (
-    <Card>
-      <CardContent className="p-4 text-center">
-        <div className="text-2xl font-bold">{value}</div>
-        <div className="text-xs text-muted-foreground mt-1">{label}</div>
-      </CardContent>
-    </Card>
   )
 }
