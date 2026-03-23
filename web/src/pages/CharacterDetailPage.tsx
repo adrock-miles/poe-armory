@@ -5,12 +5,11 @@ import type { Character, CharacterSnapshot } from "@/types/character"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatDate } from "@/lib/utils"
 import { ArrowLeft, Camera, Clock, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { GearPanel } from "@/components/GearPanel"
-import { GemsPanel } from "@/components/GemsPanel"
+import { ActiveSkillsSummary } from "@/components/ActiveSkillsSummary"
 import { PassiveTreePanel } from "@/components/PassiveTreePanel"
 import { SnapshotSelector } from "@/components/SnapshotSelector"
 
@@ -56,6 +55,10 @@ export function CharacterDetailPage() {
     try {
       const snap = await api.snapshotCharacter(charId)
       setActiveSnapshot(snap)
+      // Update the displayed character level from the fresh snapshot data
+      if (character && snap.level !== character.level) {
+        setCharacter({ ...character, level: snap.level, experience: snap.experience })
+      }
       const snaps = await api.listSnapshots(charId)
       setSnapshots(Array.isArray(snaps) ? snaps : [])
       toast.success("Snapshot created successfully!")
@@ -133,27 +136,15 @@ export function CharacterDetailPage() {
         />
       )}
 
-      {/* Content */}
+      {/* Content — single overview: equipment, skills, passive tree */}
       {activeSnapshot ? (
-        <Tabs defaultValue="gear" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="gear">Equipment</TabsTrigger>
-            <TabsTrigger value="gems">Gems & Skills</TabsTrigger>
-            <TabsTrigger value="tree">Passive Tree</TabsTrigger>
-          </TabsList>
+        <div className="space-y-6">
+          <GearPanel items={activeSnapshot.items || []} gems={activeSnapshot.gems || []} />
 
-          <TabsContent value="gear">
-            <GearPanel items={activeSnapshot.items || []} gems={activeSnapshot.gems || []} />
-          </TabsContent>
+          <ActiveSkillsSummary gems={activeSnapshot.gems || []} />
 
-          <TabsContent value="gems">
-            <GemsPanel gems={activeSnapshot.gems || []} items={activeSnapshot.items || []} />
-          </TabsContent>
-
-          <TabsContent value="tree">
-            <PassiveTreePanel tree={activeSnapshot.passiveTree} />
-          </TabsContent>
-        </Tabs>
+          <PassiveTreePanel tree={activeSnapshot.passiveTree} />
+        </div>
       ) : (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">

@@ -193,7 +193,7 @@ type poeRawGem struct {
 
 // GetItems fetches equipped items and socketed gems for a character.
 // Endpoint: {hostName}character-window/get-items?accountName={name}&character={charName}&realm={code}
-func (c *Client) GetItems(ctx context.Context, accountName, characterName string) ([]model.Item, []model.Gem, error) {
+func (c *Client) GetItems(ctx context.Context, accountName, characterName string) ([]model.Item, []model.Gem, *model.CharacterInfo, error) {
 	params := url.Values{
 		"accountName": {accountName},
 		"character":   {characterName},
@@ -201,12 +201,12 @@ func (c *Client) GetItems(ctx context.Context, accountName, characterName string
 	}
 	body, err := c.doRequest(ctx, "character-window/get-items", params)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	var resp poeItemsResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, nil, fmt.Errorf("parsing items response: %w", err)
+		return nil, nil, nil, fmt.Errorf("parsing items response: %w", err)
 	}
 
 	var items []model.Item
@@ -275,7 +275,12 @@ func (c *Client) GetItems(ctx context.Context, accountName, characterName string
 		}
 	}
 
-	return items, gems, nil
+	charInfo := &model.CharacterInfo{
+		Level:      resp.Character.Level,
+		Experience: resp.Character.Experience,
+	}
+
+	return items, gems, charInfo, nil
 }
 
 // flexibleMap is a map[string]int that gracefully handles the PoE API returning

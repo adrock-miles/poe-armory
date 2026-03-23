@@ -132,6 +132,12 @@ type ClusterPassive struct {
 	Type   string   `json:"type"` // "notable", "small", "socket"
 }
 
+// CharacterInfo holds the live character metadata returned alongside API responses.
+type CharacterInfo struct {
+	Level      int
+	Experience int64
+}
+
 // AscendancyInfo holds parsed ascendancy data.
 type AscendancyInfo struct {
 	ClassName       string   `json:"className"`

@@ -12,7 +12,7 @@ import (
 // PoeAPIClient defines the contract for fetching character data from the PoE public API.
 type PoeAPIClient interface {
 	GetCharacters(ctx context.Context, accountName string) ([]model.Character, error)
-	GetItems(ctx context.Context, accountName, characterName string) ([]model.Item, []model.Gem, error)
+	GetItems(ctx context.Context, accountName, characterName string) ([]model.Item, []model.Gem, *model.CharacterInfo, error)
 	GetPassiveTree(ctx context.Context, accountName, characterName string) (*model.PassiveTree, error)
 }
 
@@ -89,7 +89,7 @@ func (s *CharacterService) SnapshotCharacter(ctx context.Context, accountName, c
 		return nil, fmt.Errorf("finding character: %w", err)
 	}
 
-	items, gems, err := s.poeClient.GetItems(ctx, accountName, characterName)
+	items, gems, liveInfo, err := s.poeClient.GetItems(ctx, accountName, characterName)
 	if err != nil {
 		return nil, fmt.Errorf("fetching items: %w", err)
 	}
@@ -99,10 +99,24 @@ func (s *CharacterService) SnapshotCharacter(ctx context.Context, accountName, c
 		return nil, fmt.Errorf("fetching passive tree: %w", err)
 	}
 
+	// Use the live level/experience from the API response rather than the
+	// potentially stale values stored in the database.
+	level := char.Level
+	experience := char.Experience
+	if liveInfo != nil {
+		level = liveInfo.Level
+		experience = liveInfo.Experience
+
+		// Also update the stored character so the UI stays in sync.
+		char.Level = level
+		char.Experience = experience
+		_ = s.charRepo.Upsert(ctx, char)
+	}
+
 	snapshot := &model.CharacterSnapshot{
 		CharacterID: char.ID,
-		Level:       char.Level,
-		Experience:  char.Experience,
+		Level:       level,
+		Experience:  experience,
 		SnapshotAt:  time.Now().UTC(),
 		Items:       items,
 		Gems:        gems,
