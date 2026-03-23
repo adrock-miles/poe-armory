@@ -1,77 +1,106 @@
-import type { Gem } from "@/types/character"
+import type { Gem, Item } from "@/types/character"
 import { Card, CardContent } from "@/components/ui/card"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { Badge } from "@/components/ui/badge"
 import { slotDisplayName } from "@/lib/utils"
 
 interface Props {
   gems: Gem[]
+  items: Item[]
 }
 
-export function ActiveSkillsSummary({ gems }: Props) {
+/** A link group: the slot it lives in, the socket group index, and the gems sorted skill-first. */
+interface GemLink {
+  slot: string
+  socketGroup: number
+  gems: Gem[]
+}
+
+export function ActiveSkillsSummary({ gems, items }: Props) {
   if (gems.length === 0) return null
 
-  const activeGems = gems.filter((g) => !g.isSupport)
-  const supportCount = gems.filter((g) => g.isSupport).length
+  // Build a lookup of item name by slot
+  const itemBySlot: Record<string, Item> = {}
+  for (const item of items) {
+    itemBySlot[item.slot] = item
+  }
 
-  if (activeGems.length === 0) return null
+  // Group gems by slot + socketGroup
+  const linkMap = new Map<string, GemLink>()
+  for (const gem of gems) {
+    const key = `${gem.itemSlot}::${gem.socketGroup}`
+    if (!linkMap.has(key)) {
+      linkMap.set(key, { slot: gem.itemSlot, socketGroup: gem.socketGroup, gems: [] })
+    }
+    linkMap.get(key)!.gems.push(gem)
+  }
+
+  // Sort each link: active skills first, then supports
+  const links = Array.from(linkMap.values())
+  for (const link of links) {
+    link.gems.sort((a, b) => (a.isSupport === b.isSupport ? 0 : a.isSupport ? 1 : -1))
+  }
+
+  // Sort links so those with an active skill come first
+  links.sort((a, b) => {
+    const aHasActive = a.gems.some((g) => !g.isSupport) ? 0 : 1
+    const bHasActive = b.gems.some((g) => !g.isSupport) ? 0 : 1
+    return aHasActive - bHasActive
+  })
+
+  const totalActive = gems.filter((g) => !g.isSupport).length
+  const totalSupport = gems.filter((g) => g.isSupport).length
 
   return (
     <Card>
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-muted-foreground">Active Skills</h3>
+          <h3 className="text-sm font-medium text-muted-foreground">Gem Links</h3>
           <span className="text-xs text-muted-foreground">
-            {activeGems.length} skills, {supportCount} supports
+            {totalActive} skills, {totalSupport} supports
           </span>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {activeGems.map((gem) => (
-            <Tooltip key={gem.id}>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-2 p-2 rounded-md bg-secondary/50 cursor-default">
-                  {gem.iconUrl && (
-                    <img src={gem.iconUrl} alt={gem.name} className="w-8 h-8 object-contain" loading="lazy" />
-                  )}
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-poe-gem truncate">{gem.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Lv {gem.level}
-                      {gem.quality > 0 && ` / ${gem.quality}%`}
-                    </div>
-                  </div>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-[260px] p-3">
-                <div className="flex items-center gap-2 mb-1.5">
-                  {gem.iconUrl && (
-                    <img src={gem.iconUrl} alt={gem.name} className="w-8 h-8 object-contain flex-shrink-0" />
-                  )}
-                  <div>
-                    <div className="font-semibold text-sm text-poe-gem">{gem.name}</div>
-                    <div className="text-[10px] text-muted-foreground">Skill Gem</div>
-                  </div>
-                </div>
-                <div className="space-y-0.5 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Level</span>
-                    <span>{gem.level}</span>
-                  </div>
-                  {gem.quality > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Quality</span>
-                      <span className="text-blue-300">+{gem.quality}%</span>
-                    </div>
-                  )}
-                  {gem.itemSlot && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Slot</span>
-                      <span>{slotDisplayName(gem.itemSlot)}</span>
-                    </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {links.map((link) => {
+            const item = itemBySlot[link.slot]
+            const activeGem = link.gems.find((g) => !g.isSupport)
+            return (
+              <div
+                key={`${link.slot}-${link.socketGroup}`}
+                className="rounded-md border border-border/50 bg-secondary/30 p-2.5"
+              >
+                {/* Header: slot name + item */}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                    {slotDisplayName(link.slot)}
+                  </span>
+                  {item && (
+                    <span className="text-[10px] text-muted-foreground/70 truncate">
+                      — {item.name || item.typeLine}
+                    </span>
                   )}
                 </div>
-              </TooltipContent>
-            </Tooltip>
-          ))}
+
+                {/* Gems in this link */}
+                <div className="space-y-1">
+                  {link.gems.map((gem) => (
+                    <div key={gem.id} className="flex items-center gap-2">
+                      {gem.iconUrl && (
+                        <img src={gem.iconUrl} alt={gem.name} className="w-5 h-5 object-contain flex-shrink-0" loading="lazy" />
+                      )}
+                      <span className={`text-sm truncate ${gem.isSupport ? "text-blue-400" : "text-poe-gem font-medium"}`}>
+                        {gem.name}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground ml-auto flex-shrink-0">
+                        Lv{gem.level}
+                        {gem.quality > 0 && ` / ${gem.quality}%`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
         </div>
       </CardContent>
     </Card>

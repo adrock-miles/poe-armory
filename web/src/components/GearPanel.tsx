@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react"
-import type { Gem, Item } from "@/types/character"
+import type { Gem, Item, TreeJewel } from "@/types/character"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { frameTypeToColor } from "@/lib/utils"
@@ -7,6 +7,7 @@ import { frameTypeToColor } from "@/lib/utils"
 interface Props {
   items: Item[]
   gems: Gem[]
+  jewels?: TreeJewel[]
 }
 
 // Desktop grid: 9 columns × 8 rows.
@@ -38,7 +39,7 @@ const SOCKET_COLORS: Record<string, string> = {
   DV: "bg-gray-500",
 }
 
-export function GearPanel({ items, gems }: Props) {
+export function GearPanel({ items, gems, jewels }: Props) {
   const [activePopover, setActivePopover] = useState<number | null>(null)
   const [hoverPopover, setHoverPopover] = useState<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -152,6 +153,18 @@ export function GearPanel({ items, gems }: Props) {
               ))}
             </div>
           )}
+
+          {/* Tree jewels row */}
+          {jewels && jewels.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-[#2a2520]">
+              <div className="text-[9px] uppercase tracking-wider text-muted-foreground/50 text-center mb-2">Jewels</div>
+              <div className="flex justify-center gap-[6px] flex-wrap">
+                {jewels.map((j, i) => (
+                  <JewelIcon key={i} jewel={j} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -190,6 +203,18 @@ export function GearPanel({ items, gems }: Props) {
                 onHoverEnter={onHoverEnter}
                 onHoverLeave={onHoverLeave}
               />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile jewels */}
+      {jewels && jewels.length > 0 && (
+        <div className="md:hidden">
+          <h3 className="text-xs font-medium text-muted-foreground mb-2 text-center">Jewels</h3>
+          <div className="flex justify-center gap-2 flex-wrap">
+            {jewels.map((j, i) => (
+              <JewelIcon key={i} jewel={j} />
             ))}
           </div>
         </div>
@@ -532,6 +557,112 @@ function ItemPopover({
                   </span>
                 </div>
               ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ───────────────── Jewel icon with hover popover ───────────────── */
+
+function JewelIcon({ jewel }: { jewel: TreeJewel }) {
+  const borderColor = frameTypeToColor(jewel.frameType ?? 0)
+
+  return (
+    <div className="relative group/jewel">
+      <div
+        className="w-[40px] h-[40px] flex items-center justify-center bg-[#141210] border cursor-default transition-colors hover:bg-[#1e1a16]"
+        style={{ borderColor, borderWidth: "2px" }}
+      >
+        {jewel.iconUrl ? (
+          <img src={jewel.iconUrl} alt={jewel.name || jewel.typeLine} className="w-[34px] h-[34px] object-contain" />
+        ) : (
+          <span className="text-[8px] text-muted-foreground/40">Jewel</span>
+        )}
+      </div>
+      {/* Hover popover */}
+      <div className="hidden group-hover/jewel:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 pointer-events-none">
+        <JewelTooltip jewel={jewel} />
+      </div>
+    </div>
+  )
+}
+
+function JewelTooltip({ jewel }: { jewel: TreeJewel }) {
+  const borderColor = frameTypeToColor(jewel.frameType ?? 0)
+  return (
+    <div className="bg-[#1a1612] border border-[#3a3226] rounded-lg shadow-xl p-3 w-[260px] text-left">
+      <div className="flex items-start gap-2 mb-1.5">
+        {jewel.iconUrl && (
+          <img src={jewel.iconUrl} alt={jewel.name || jewel.typeLine} className="w-8 h-8 object-contain flex-shrink-0" />
+        )}
+        <div className="min-w-0">
+          {jewel.name && (
+            <div className="text-sm font-medium truncate" style={{ color: borderColor }}>
+              {jewel.name}
+            </div>
+          )}
+          <div className="text-xs text-muted-foreground">{jewel.typeLine}</div>
+        </div>
+      </div>
+      {jewel.implicitMods && jewel.implicitMods.length > 0 && (
+        <div className="space-y-0.5 mt-1">
+          {jewel.implicitMods.map((mod, i) => (
+            <div key={`i${i}`} className="text-[11px] text-blue-400">{mod}</div>
+          ))}
+        </div>
+      )}
+      {jewel.explicitMods && jewel.explicitMods.length > 0 && (
+        <div className="space-y-0.5 mt-1">
+          {jewel.explicitMods.map((mod, i) => (
+            <div key={`x${i}`} className="text-[11px] text-blue-300">{mod}</div>
+          ))}
+        </div>
+      )}
+      {jewel.clusterPassives && jewel.clusterPassives.length > 0 && (
+        <div className="mt-2 pt-1 border-t border-[#3a3226]">
+          <div className="text-[10px] text-muted-foreground mb-1">Cluster Passives</div>
+          {jewel.clusterPassives.filter(p => p.type !== "socket").map((p, i) => (
+            <div key={i}>
+              <span className={`text-xs ${p.type === "notable" ? "text-amber-300 font-medium" : "text-gray-300"}`}>
+                {p.name}
+              </span>
+              {p.stats && p.stats.length > 0 && (
+                <div className="ml-2">
+                  {p.stats.map((s, si) => (
+                    <div key={si} className="text-[11px] text-blue-300">{s}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {jewel.subJewels && jewel.subJewels.length > 0 && (
+        <div className="mt-2 pt-1 border-t border-[#3a3226]">
+          <div className="text-[10px] text-muted-foreground mb-1">Socketed Jewels</div>
+          {jewel.subJewels.map((sj, i) => (
+            <div key={i} className="flex items-start gap-2 mt-1">
+              {sj.iconUrl && (
+                <img src={sj.iconUrl} alt={sj.name || sj.typeLine} className="w-6 h-6 object-contain flex-shrink-0" />
+              )}
+              <div className="min-w-0">
+                {sj.name && (
+                  <div className="text-xs font-medium truncate" style={{ color: frameTypeToColor(sj.frameType ?? 0) }}>
+                    {sj.name}
+                  </div>
+                )}
+                <div className="text-[11px] text-muted-foreground">{sj.typeLine}</div>
+                {sj.explicitMods && sj.explicitMods.length > 0 && (
+                  <div className="mt-0.5 space-y-0.5">
+                    {sj.explicitMods.map((mod, mi) => (
+                      <div key={mi} className="text-[11px] text-blue-300">{mod}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
