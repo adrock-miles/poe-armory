@@ -167,7 +167,7 @@ export function GearPanel({ items, gems, jewels, characterId }: GearPanelProps) 
   }
 
   return (
-    <div className="space-y-3 pb-[300px] md:pb-[200px]" ref={containerRef}>
+    <div className="space-y-3" ref={containerRef}>
       {/* ── Desktop: game-faithful inventory panel ── */}
       <div className="hidden md:flex justify-center">
         <div
@@ -842,12 +842,6 @@ export function GemTooltipInner({ gem }: { gem: Gem }) {
           )}
         </div>
       </div>
-
-      {gem.descrText && (
-        <div className="border-t border-[#3a3226] pt-1.5">
-          <p className="text-[11px] text-gray-300 leading-snug whitespace-normal">{gem.descrText}</p>
-        </div>
-      )}
 
       {gem.quality > 0 && (
         <div className="border-t border-[#3a3226] pt-1.5 mt-1">

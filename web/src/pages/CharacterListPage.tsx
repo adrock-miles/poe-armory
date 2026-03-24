@@ -11,13 +11,13 @@ import { Download, Camera, Trash2, Search, Filter, Users, X, CheckSquare, Square
 import { toast } from "sonner"
 
 const CLASS_COLORS: Record<string, string> = {
-  Marauder: "bg-red-900/50 text-red-300",
-  Witch: "bg-purple-900/50 text-purple-300",
-  Ranger: "bg-green-900/50 text-green-300",
-  Duelist: "bg-yellow-900/50 text-yellow-300",
-  Templar: "bg-blue-900/50 text-blue-300",
-  Shadow: "bg-indigo-900/50 text-indigo-300",
-  Scion: "bg-gray-700/50 text-gray-300",
+  Marauder: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+  Witch: "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300",
+  Ranger: "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
+  Duelist: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
+  Templar: "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300",
+  Shadow: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300",
+  Scion: "bg-gray-100 text-gray-800 dark:bg-gray-700/50 dark:text-gray-300",
 }
 
 function sortLeagues(a: string, b: string): number {
@@ -165,7 +165,15 @@ export function CharacterListPage() {
   async function handleSnapshot(id: number) {
     setSnapshottingId(id)
     try {
-      await api.snapshotCharacter(id)
+      const snap = await api.snapshotCharacter(id)
+      // Update character level/details from the snapshot
+      if (snap && snap.level) {
+        setCharacters((prev) =>
+          prev.map((c) =>
+            c.id === id ? { ...c, level: snap.level, experience: snap.experience, updatedAt: snap.snapshotAt } : c
+          )
+        )
+      }
       toast.success("Snapshot created successfully!")
     } catch (err: any) {
       toast.error(err.message || "Failed to create snapshot")
@@ -366,7 +374,7 @@ export function CharacterListPage() {
           <select
             value={selectedLeague}
             onChange={(e) => setSelectedLeague(e.target.value)}
-            className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+            className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
           >
             <option value="">All Leagues</option>
             {leagues.map((l) => (
@@ -379,7 +387,7 @@ export function CharacterListPage() {
             <select
               value={selectedAccount}
               onChange={(e) => setSelectedAccount(e.target.value)}
-              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
             >
               <option value="">All Accounts</option>
               {accounts.map((a) => (
@@ -474,39 +482,41 @@ export function CharacterListPage() {
                     className={`hover:bg-accent/50 transition-colors ${selectMode && selectedIds.has(char.id) ? "ring-1 ring-primary" : ""}`}
                   >
                     <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 min-w-0">
+                        <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
                           {selectMode && (
                             <input
                               type="checkbox"
                               checked={selectedIds.has(char.id)}
                               onChange={() => toggleSelectId(char.id)}
-                              className="rounded"
+                              className="rounded flex-shrink-0"
                             />
                           )}
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-shrink">
                             <Link
                               to={`/characters/${char.id}`}
-                              className="font-medium hover:text-primary transition-colors"
+                              className="font-medium hover:text-primary transition-colors truncate block"
                             >
                               {char.name}
                             </Link>
                             <div className="flex items-center gap-2 mt-0.5">
-                              <Users className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-xs text-muted-foreground">{char.accountName}</span>
+                              <Users className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                              <span className="text-xs text-muted-foreground truncate">{char.accountName}</span>
                             </div>
                           </div>
-                          <Badge variant="outline" className={CLASS_COLORS[char.class] || ""}>
-                            {char.ascendancy || char.class}
-                          </Badge>
-                          <span className="font-mono text-sm">Lv {char.level}</span>
-                          <span className="text-xs text-muted-foreground hidden md:inline">
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Badge variant="outline" className={CLASS_COLORS[char.class] || ""}>
+                              {char.ascendancy || char.class}
+                            </Badge>
+                            <span className="font-mono text-sm">Lv {char.level}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground hidden md:inline flex-shrink-0">
                             Updated {formatDate(char.updatedAt)}
                           </span>
                         </div>
 
                         {!selectMode && (
-                          <div className="flex gap-1 ml-2">
+                          <div className="flex gap-1 flex-shrink-0">
                             <Button
                               variant="ghost"
                               size="icon"

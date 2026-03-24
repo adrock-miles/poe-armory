@@ -115,10 +115,10 @@ export function CharacterDetailPage() {
                 {character.accountName}
               </p>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className="bg-amber-700/30 text-amber-300 border-amber-700/50 hover:bg-amber-700/40">
+                <Badge className="bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 dark:bg-amber-700/30 dark:text-amber-300 dark:border-amber-700/50 dark:hover:bg-amber-700/40">
                   Level {character.level}
                 </Badge>
-                <Badge variant="secondary" className="font-medium">
+                <Badge variant="secondary" className="font-medium text-foreground">
                   {ascendancyOrClass}
                 </Badge>
                 <Badge variant="outline">
@@ -132,22 +132,24 @@ export function CharacterDetailPage() {
           </div>
 
           {/* Right: snapshot controls */}
-          <div className="flex flex-col gap-2 sm:items-end">
-            <Button onClick={handleSnapshot} disabled={snapshotting} size="sm">
-              {snapshotting ? (
-                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Camera className="mr-2 h-3.5 w-3.5" />
+          <div className="flex flex-col gap-2 sm:items-end w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={handleSnapshot} disabled={snapshotting} size="sm" className="flex-shrink-0">
+                {snapshotting ? (
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Camera className="mr-2 h-3.5 w-3.5" />
+                )}
+                {snapshotting ? "Snapshotting..." : "Take Snapshot"}
+              </Button>
+              {snapshots.length > 0 && (
+                <SnapshotSelector
+                  snapshots={snapshots}
+                  activeId={activeSnapshot?.id ?? 0}
+                  onSelect={handleSelectSnapshot}
+                />
               )}
-              {snapshotting ? "Snapshotting..." : "Take Snapshot"}
-            </Button>
-            {snapshots.length > 0 && (
-              <SnapshotSelector
-                snapshots={snapshots}
-                activeId={activeSnapshot?.id ?? 0}
-                onSelect={handleSelectSnapshot}
-              />
-            )}
+            </div>
           </div>
         </div>
       </div>

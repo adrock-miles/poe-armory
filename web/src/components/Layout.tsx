@@ -19,7 +19,7 @@ export function Layout() {
           </div>
         </div>
       </header>
-      <main className="container py-6 pb-12 flex-1">
+      <main className="container py-6 pb-12 flex-1 overflow-x-hidden">
         <Outlet />
       </main>
       <footer className="border-t py-6 text-center text-xs text-muted-foreground">

@@ -82,6 +82,17 @@
   }
 }
 
+/* Native select/option styling for dark themes */
+.dark select option,
+.mirage select option {
+  background-color: hsl(224 20% 16%);
+  color: hsl(210 20% 90%);
+}
+.mirage select option {
+  background-color: hsl(260 25% 16%);
+  color: hsl(220 30% 88%);
+}
+
 /* PoE-style item tooltip */
 .item-tooltip {
   @apply rounded-md border border-border bg-popover p-3 text-sm shadow-lg;
