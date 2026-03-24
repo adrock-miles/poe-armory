@@ -1,11 +1,17 @@
-import { useState, useEffect, useCallback, useRef } from "react"
-import { X, History, ChevronRight } from "lucide-react"
+import { useState, useEffect } from "react"
+import { History, ChevronRight } from "lucide-react"
 import { api } from "@/lib/api"
 import type { GearHistoryEntry } from "@/types/character"
 import { frameTypeToColor, formatDate, slotDisplayName } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { ItemModList } from "./ItemModList"
 import { SocketDots } from "./SocketDots"
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer"
 
 interface Props {
   characterId: number
@@ -19,7 +25,6 @@ export function GearHistoryDrawer({ characterId, slot, open, onClose }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
-  const overlayRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -33,60 +38,17 @@ export function GearHistoryDrawer({ characterId, slot, open, onClose }: Props) {
       .finally(() => setLoading(false))
   }, [open, characterId, slot])
 
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose()
-    }
-    document.addEventListener("keydown", onKey)
-    return () => document.removeEventListener("keydown", onKey)
-  }, [open, onClose])
-
-  // Prevent body scroll when open
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden"
-    }
-    return () => {
-      document.body.style.overflow = ""
-    }
-  }, [open])
-
-  const handleOverlayClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (e.target === overlayRef.current) onClose()
-    },
-    [onClose],
-  )
-
-  if (!open) return null
-
   return (
-    <div
-      ref={overlayRef}
-      className="fixed inset-0 z-[100] bg-black/60 flex items-start justify-center pt-[5vh] md:pt-[10vh]"
-      onClick={handleOverlayClick}
-    >
-      <div className="bg-[#0c0a08] border border-[#3a3226] rounded-lg shadow-2xl w-[95vw] max-w-[480px] max-h-[80vh] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-200">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#3a3226]">
-          <div className="flex items-center gap-2">
+    <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
+      <DrawerContent className="max-h-[85vh]">
+        <DrawerHeader className="text-left">
+          <DrawerTitle className="flex items-center gap-2 text-sm">
             <History className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold text-gray-100">
-              {slotDisplayName(slot)} History
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-gray-100 transition-colors p-1 rounded hover:bg-[#1e1a16]"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+            {slotDisplayName(slot)} History
+          </DrawerTitle>
+        </DrawerHeader>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto px-4 py-3">
+        <div className="flex-1 overflow-y-auto px-4 pb-6">
           {loading && (
             <div className="text-center text-muted-foreground py-8 text-sm">Loading history...</div>
           )}
@@ -104,7 +66,7 @@ export function GearHistoryDrawer({ characterId, slot, open, onClose }: Props) {
           {!loading && !error && history.length > 0 && (
             <div className="relative">
               {/* Timeline line */}
-              <div className="absolute left-[15px] top-2 bottom-2 w-px bg-[#3a3226]" />
+              <div className="absolute left-[15px] top-2 bottom-2 w-px bg-border" />
 
               <div className="space-y-1">
                 {history.map((entry, idx) => (
@@ -120,8 +82,8 @@ export function GearHistoryDrawer({ characterId, slot, open, onClose }: Props) {
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </DrawerContent>
+    </Drawer>
   )
 }
 
@@ -146,12 +108,12 @@ function HistoryEntry({
         className="absolute left-[11px] top-3 w-[9px] h-[9px] rounded-full border-2"
         style={{
           borderColor,
-          backgroundColor: isLatest ? borderColor : "#0c0a08",
+          backgroundColor: isLatest ? borderColor : "transparent",
         }}
       />
 
       <div
-        className="rounded-lg border border-[#2a2520] bg-[#141210] hover:bg-[#1a1612] transition-colors cursor-pointer p-2.5"
+        className="rounded-lg border border-border/50 bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer p-2.5"
         onClick={onToggle}
       >
         <div className="flex items-center gap-2">
@@ -169,7 +131,7 @@ function HistoryEntry({
                 {item.name || item.typeLine}
               </span>
               {isLatest && (
-                <Badge className="text-[8px] px-1 py-0 bg-emerald-900/50 text-emerald-400 border-emerald-700">
+                <Badge className="text-[8px] px-1 py-0 bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/50 dark:text-emerald-400 dark:border-emerald-700">
                   Current
                 </Badge>
               )}
@@ -196,7 +158,7 @@ function HistoryEntry({
 
         {/* Expanded detail */}
         {expanded && (
-          <div className="mt-2 pt-2 border-t border-[#2a2520] space-y-1">
+          <div className="mt-2 pt-2 border-t border-border/50 space-y-1">
             <div className="flex gap-1 flex-wrap">
               {item.corrupted && (
                 <Badge variant="destructive" className="text-[9px] px-1 py-0">Corrupted</Badge>
