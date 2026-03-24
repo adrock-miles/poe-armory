@@ -181,14 +181,17 @@ type poeRawItem struct {
 }
 
 type poeRawGem struct {
-	Name     string `json:"name,omitempty"`
-	TypeLine string `json:"typeLine"`
-	Icon     string `json:"icon"`
-	Support  bool   `json:"support"`
+	Name      string `json:"name,omitempty"`
+	TypeLine  string `json:"typeLine"`
+	Icon      string `json:"icon"`
+	Support   bool   `json:"support"`
+	Imbued    bool   `json:"imbued"`
+	DescrText string `json:"descrText"`
 	Properties []struct {
 		Name   string          `json:"name"`
 		Values [][]interface{} `json:"values"`
 	} `json:"properties"`
+	ExplicitMods []string `json:"explicitMods"`
 }
 
 // GetItems fetches equipped items and socketed gems for a character.
@@ -269,6 +272,9 @@ func (c *Client) GetItems(ctx context.Context, accountName, characterName string
 				Level:       gemLevel,
 				Quality:     gemQuality,
 				IsSupport:   rawGem.Support,
+				Imbued:      rawGem.Imbued,
+				ImbuedMods:  rawGem.ExplicitMods,
+				DescrText:   rawGem.DescrText,
 				RawJSON:     string(socketedRaw),
 			}
 			gems = append(gems, gem)

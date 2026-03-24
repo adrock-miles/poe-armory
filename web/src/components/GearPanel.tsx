@@ -818,40 +818,54 @@ function ItemProperties({ properties }: { properties?: ItemProperty[] }) {
 export function GemTooltipInner({ gem }: { gem: Gem }) {
   // typeLine may include variant prefix e.g. "Anomalous Arc" vs name "Arc"
   const variant = gem.typeLine && gem.typeLine !== gem.name ? gem.typeLine : null
+  const hasImbuedMods = gem.imbued && gem.imbuedMods && gem.imbuedMods.length > 0
 
   return (
-    <div className="bg-[#1a1612] border border-[#3a3226] rounded-lg shadow-xl p-2.5 w-[220px] text-left">
+    <div className="bg-[#1a1612] border border-[#3a3226] rounded-lg shadow-xl p-2.5 w-[260px] text-left">
       <div className="flex items-start gap-2 mb-1.5">
         {gem.iconUrl && (
           <img src={gem.iconUrl} alt={gem.name} className="w-7 h-7 object-contain flex-shrink-0 mt-0.5" />
         )}
-        <div>
-          <div className={`text-xs font-semibold leading-tight ${gem.isSupport ? "text-blue-400" : "text-poe-gem"}`}>
-            {variant ?? gem.name}
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={`text-xs font-semibold leading-tight ${gem.isSupport ? "text-blue-400" : "text-poe-gem"}`}>
+              {variant ?? gem.name}
+            </span>
+            {gem.imbued && (
+              <span className="text-[9px] font-bold uppercase tracking-wide px-1 py-0.5 rounded bg-violet-900/60 text-violet-300 border border-violet-700/50 leading-none">
+                Imbued
+              </span>
+            )}
           </div>
           {variant && (
             <div className="text-[10px] text-muted-foreground/70 leading-tight mt-0.5">{gem.name}</div>
           )}
         </div>
       </div>
-      <div className="border-t border-[#3a3226] pt-1.5 space-y-0.5">
-        <div className="flex justify-between text-[11px]">
-          <span className="text-muted-foreground">Type</span>
-          <span className={gem.isSupport ? "text-blue-300" : "text-amber-300"}>
-            {gem.isSupport ? "Support" : "Active Skill"}
-          </span>
+
+      {gem.descrText && (
+        <div className="border-t border-[#3a3226] pt-1.5">
+          <p className="text-[11px] text-gray-300 leading-snug whitespace-normal">{gem.descrText}</p>
         </div>
-        <div className="flex justify-between text-[11px]">
-          <span className="text-muted-foreground">Level</span>
-          <span className="text-gray-200">{gem.level}</span>
-        </div>
-        {gem.quality > 0 && (
+      )}
+
+      {gem.quality > 0 && (
+        <div className="border-t border-[#3a3226] pt-1.5 mt-1">
           <div className="flex justify-between text-[11px]">
             <span className="text-muted-foreground">Quality</span>
             <span className="text-gray-200">{gem.quality}%</span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {hasImbuedMods && (
+        <div className="border-t border-violet-800/40 mt-1.5 pt-1.5">
+          <div className="text-[10px] text-violet-400 font-medium mb-1 uppercase tracking-wide">Imbue Effect</div>
+          {gem.imbuedMods!.map((mod, i) => (
+            <div key={i} className="text-[11px] text-violet-200/90 leading-snug">{mod}</div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -105,5 +105,16 @@ func RunMigrations(db *sql.DB) error {
 		}
 	}
 
+	// Additive column migrations — safe to run repeatedly; errors mean the
+	// column already exists and are intentionally ignored.
+	additive := []string{
+		`ALTER TABLE gems ADD COLUMN imbued INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE gems ADD COLUMN imbued_mods TEXT NOT NULL DEFAULT '[]'`,
+		`ALTER TABLE gems ADD COLUMN descr_text TEXT NOT NULL DEFAULT ''`,
+	}
+	for _, m := range additive {
+		db.Exec(m) // nolint: errcheck — duplicate column errors are expected and safe
+	}
+
 	return nil
 }

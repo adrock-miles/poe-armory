@@ -56,11 +56,12 @@ func (r *SQLiteSnapshotRepo) Create(ctx context.Context, snapshot *model.Charact
 
 	for i := range snapshot.Gems {
 		gem := &snapshot.Gems[i]
+		imbuedModsJSON, _ := json.Marshal(gem.ImbuedMods)
 		res, err := tx.ExecContext(ctx, `
-			INSERT INTO gems (snapshot_id, item_slot, socket_group, name, type_line, icon_url, level, quality, is_support, raw_json)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			INSERT INTO gems (snapshot_id, item_slot, socket_group, name, type_line, icon_url, level, quality, is_support, imbued, imbued_mods, descr_text, raw_json)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			snapshotID, gem.ItemSlot, gem.SocketGroup, gem.Name, gem.TypeLine,
-			gem.IconURL, gem.Level, gem.Quality, gem.IsSupport, gem.RawJSON)
+			gem.IconURL, gem.Level, gem.Quality, gem.IsSupport, gem.Imbued, string(imbuedModsJSON), gem.DescrText, gem.RawJSON)
 		if err != nil {
 			return fmt.Errorf("inserting gem: %w", err)
 		}
@@ -324,7 +325,7 @@ func (r *SQLiteSnapshotRepo) loadSnapshotRelations(ctx context.Context, snapshot
 
 	// Load gems
 	gemRows, err := r.db.QueryContext(ctx, `
-		SELECT id, snapshot_id, item_slot, socket_group, name, type_line, icon_url, level, quality, is_support, raw_json
+		SELECT id, snapshot_id, item_slot, socket_group, name, type_line, icon_url, level, quality, is_support, imbued, imbued_mods, descr_text, raw_json
 		FROM gems WHERE snapshot_id = ?`, snapshot.ID)
 	if err != nil {
 		return err
@@ -333,10 +334,13 @@ func (r *SQLiteSnapshotRepo) loadSnapshotRelations(ctx context.Context, snapshot
 
 	for gemRows.Next() {
 		var gem model.Gem
+		var imbuedModsJSON string
 		if err := gemRows.Scan(&gem.ID, &gem.SnapshotID, &gem.ItemSlot, &gem.SocketGroup,
-			&gem.Name, &gem.TypeLine, &gem.IconURL, &gem.Level, &gem.Quality, &gem.IsSupport, &gem.RawJSON); err != nil {
+			&gem.Name, &gem.TypeLine, &gem.IconURL, &gem.Level, &gem.Quality, &gem.IsSupport,
+			&gem.Imbued, &imbuedModsJSON, &gem.DescrText, &gem.RawJSON); err != nil {
 			return err
 		}
+		json.Unmarshal([]byte(imbuedModsJSON), &gem.ImbuedMods)
 		snapshot.Gems = append(snapshot.Gems, gem)
 	}
 

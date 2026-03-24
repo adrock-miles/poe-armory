@@ -70,6 +70,9 @@ export interface Gem {
   level: number
   quality: number
   isSupport: boolean
+  imbued?: boolean
+  imbuedMods?: string[]
+  descrText?: string
 }
 
 export interface PassiveTree {

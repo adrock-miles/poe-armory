@@ -79,17 +79,20 @@ type ItemMods struct {
 
 // Gem represents a skill gem socketed in an item.
 type Gem struct {
-	ID          int64  `json:"id"`
-	SnapshotID  int64  `json:"snapshotId"`
-	ItemSlot    string `json:"itemSlot"`
-	SocketGroup int    `json:"socketGroup"`
-	Name        string `json:"name"`
-	TypeLine    string `json:"typeLine"`
-	IconURL     string `json:"iconUrl"`
-	Level       int    `json:"level"`
-	Quality     int    `json:"quality"`
-	IsSupport   bool   `json:"isSupport"`
-	RawJSON     string `json:"-"`
+	ID          int64    `json:"id"`
+	SnapshotID  int64    `json:"snapshotId"`
+	ItemSlot    string   `json:"itemSlot"`
+	SocketGroup int      `json:"socketGroup"`
+	Name        string   `json:"name"`
+	TypeLine    string   `json:"typeLine"`
+	IconURL     string   `json:"iconUrl"`
+	Level       int      `json:"level"`
+	Quality     int      `json:"quality"`
+	IsSupport   bool     `json:"isSupport"`
+	Imbued      bool     `json:"imbued,omitempty"`
+	ImbuedMods  []string `json:"imbuedMods,omitempty"`
+	DescrText   string   `json:"descrText,omitempty"`
+	RawJSON     string   `json:"-"`
 }
 
 // PassiveTree represents a character's passive skill tree allocation.
