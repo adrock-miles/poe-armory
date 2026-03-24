@@ -815,20 +815,42 @@ function ItemProperties({ properties }: { properties?: ItemProperty[] }) {
   )
 }
 
-function GemTooltipInner({ gem }: { gem: Gem }) {
+export function GemTooltipInner({ gem }: { gem: Gem }) {
+  // typeLine may include variant prefix e.g. "Anomalous Arc" vs name "Arc"
+  const variant = gem.typeLine && gem.typeLine !== gem.name ? gem.typeLine : null
+
   return (
-    <div className="bg-[#1a1612] border border-[#3a3226] rounded-lg shadow-xl p-2 w-[200px] text-left whitespace-nowrap">
-      <div className="flex items-center gap-1.5 mb-1">
+    <div className="bg-[#1a1612] border border-[#3a3226] rounded-lg shadow-xl p-2.5 w-[220px] text-left">
+      <div className="flex items-start gap-2 mb-1.5">
         {gem.iconUrl && (
-          <img src={gem.iconUrl} alt={gem.name} className="w-5 h-5 object-contain flex-shrink-0" />
+          <img src={gem.iconUrl} alt={gem.name} className="w-7 h-7 object-contain flex-shrink-0 mt-0.5" />
         )}
-        <div className={`text-xs font-medium ${gem.isSupport ? "text-blue-400" : "text-poe-gem"}`}>
-          {gem.name}
+        <div>
+          <div className={`text-xs font-semibold leading-tight ${gem.isSupport ? "text-blue-400" : "text-poe-gem"}`}>
+            {variant ?? gem.name}
+          </div>
+          {variant && (
+            <div className="text-[10px] text-muted-foreground/70 leading-tight mt-0.5">{gem.name}</div>
+          )}
         </div>
       </div>
-      <div className="text-[10px] text-muted-foreground">
-        {gem.isSupport ? "Support" : "Skill"} — Lv {gem.level}
-        {gem.quality > 0 && ` / ${gem.quality}% Quality`}
+      <div className="border-t border-[#3a3226] pt-1.5 space-y-0.5">
+        <div className="flex justify-between text-[11px]">
+          <span className="text-muted-foreground">Type</span>
+          <span className={gem.isSupport ? "text-blue-300" : "text-amber-300"}>
+            {gem.isSupport ? "Support" : "Active Skill"}
+          </span>
+        </div>
+        <div className="flex justify-between text-[11px]">
+          <span className="text-muted-foreground">Level</span>
+          <span className="text-gray-200">{gem.level}</span>
+        </div>
+        {gem.quality > 0 && (
+          <div className="flex justify-between text-[11px]">
+            <span className="text-muted-foreground">Quality</span>
+            <span className="text-gray-200">{gem.quality}%</span>
+          </div>
+        )}
       </div>
     </div>
   )
