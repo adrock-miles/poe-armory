@@ -110,6 +110,11 @@ export function ActiveSkillsSummary({ gems, items }: Props) {
                       <span className={`text-sm truncate ${gem.isSupport ? "text-blue-400" : "text-poe-gem font-medium"}`}>
                         {gem.typeLine && gem.typeLine !== gem.name ? gem.typeLine : gem.name}
                       </span>
+                      {gem.imbued && (
+                        <span className="text-[9px] font-bold uppercase tracking-wide px-1 py-0.5 rounded bg-violet-900/60 text-violet-300 border border-violet-700/50 leading-none flex-shrink-0">
+                          Imbued
+                        </span>
+                      )}
                       <span className="text-[10px] text-muted-foreground ml-auto flex-shrink-0">
                         Lv{gem.level}
                         {gem.quality > 0 && ` / ${gem.quality}%`}
