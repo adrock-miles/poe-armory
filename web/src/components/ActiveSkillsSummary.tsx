@@ -2,6 +2,7 @@ import { useMemo } from "react"
 import type { Gem, Item } from "@/types/character"
 import { Card, CardContent } from "@/components/ui/card"
 import { slotDisplayName } from "@/lib/utils"
+import { GemTooltipInner } from "@/components/GearPanel"
 
 interface Props {
   gems: Gem[]
@@ -102,17 +103,21 @@ export function ActiveSkillsSummary({ gems, items }: Props) {
                 {/* Gems in this link */}
                 <div className="space-y-1">
                   {link.gems.map((gem) => (
-                    <div key={gem.id} className="flex items-center gap-2">
+                    <div key={gem.id} className="relative group/skillgem flex items-center gap-2">
                       {gem.iconUrl && (
                         <img src={gem.iconUrl} alt={gem.name} className="w-5 h-5 object-contain flex-shrink-0" loading="lazy" />
                       )}
                       <span className={`text-sm truncate ${gem.isSupport ? "text-blue-400" : "text-poe-gem font-medium"}`}>
-                        {gem.name}
+                        {gem.typeLine && gem.typeLine !== gem.name ? gem.typeLine : gem.name}
                       </span>
                       <span className="text-[10px] text-muted-foreground ml-auto flex-shrink-0">
                         Lv{gem.level}
                         {gem.quality > 0 && ` / ${gem.quality}%`}
                       </span>
+                      {/* Hover tooltip */}
+                      <div className="hidden group-hover/skillgem:block absolute bottom-full left-0 mb-1 z-50 pointer-events-none">
+                        <GemTooltipInner gem={gem} />
+                      </div>
                     </div>
                   ))}
                 </div>

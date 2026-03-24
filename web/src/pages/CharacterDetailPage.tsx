@@ -55,7 +55,6 @@ export function CharacterDetailPage() {
     try {
       const snap = await api.snapshotCharacter(charId)
       setActiveSnapshot(snap)
-      // Update the displayed character level from the fresh snapshot data
       if (character && snap.level !== character.level) {
         setCharacter({ ...character, level: snap.level, experience: snap.experience })
       }
@@ -91,58 +90,88 @@ export function CharacterDetailPage() {
     )
   }
 
+  const ascendancyOrClass = character.ascendancy || character.class
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <Link to="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2">
-            <ArrowLeft className="mr-1 h-4 w-4" /> Back to Characters
-          </Link>
-          <h1 className="text-3xl font-bold">{character.name}</h1>
-          <div className="flex items-center gap-3 mt-2">
-            <Badge variant="outline" className="text-sm">
-              Level {character.level}
-            </Badge>
-            <Badge variant="secondary">
-              {character.ascendancy || character.class}
-            </Badge>
-            <span className="text-sm text-muted-foreground">
-              {character.league || "Standard"}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {character.accountName}
-            </span>
+    <div className="space-y-5">
+      {/* Back link */}
+      <Link to="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="mr-1 h-4 w-4" /> Back to Characters
+      </Link>
+
+      {/* Character header — poe.ninja style */}
+      <div className="rounded-lg border border-border bg-card px-5 py-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          {/* Left: identity */}
+          <div className="flex items-start gap-4">
+            {/* Class colour stripe */}
+            <div className="hidden sm:block w-1 self-stretch rounded-full bg-poe-gem opacity-60" />
+
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight leading-none mb-1">
+                {character.name}
+              </h1>
+              <p className="text-sm text-muted-foreground mb-3">
+                {character.accountName}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="bg-amber-700/30 text-amber-300 border-amber-700/50 hover:bg-amber-700/40">
+                  Level {character.level}
+                </Badge>
+                <Badge variant="secondary" className="font-medium">
+                  {ascendancyOrClass}
+                </Badge>
+                <Badge variant="outline">
+                  {character.league || "Standard"}
+                </Badge>
+                {character.ascendancy && character.ascendancy !== character.class && (
+                  <span className="text-xs text-muted-foreground">{character.class}</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right: snapshot controls */}
+          <div className="flex flex-col gap-2 sm:items-end">
+            <Button onClick={handleSnapshot} disabled={snapshotting} size="sm">
+              {snapshotting ? (
+                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Camera className="mr-2 h-3.5 w-3.5" />
+              )}
+              {snapshotting ? "Snapshotting..." : "Take Snapshot"}
+            </Button>
+            {snapshots.length > 0 && (
+              <SnapshotSelector
+                snapshots={snapshots}
+                activeId={activeSnapshot?.id ?? 0}
+                onSelect={handleSelectSnapshot}
+              />
+            )}
           </div>
         </div>
-        <Button onClick={handleSnapshot} disabled={snapshotting}>
-          {snapshotting ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Camera className="mr-2 h-4 w-4" />
-          )}
-          {snapshotting ? "Snapshotting..." : "Take Snapshot"}
-        </Button>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {/* Snapshot Selector */}
-      {snapshots.length > 0 && (
-        <SnapshotSelector
-          snapshots={snapshots}
-          activeId={activeSnapshot?.id ?? 0}
-          onSelect={handleSelectSnapshot}
-        />
-      )}
-
-      {/* Content — single overview: equipment, skills, passive tree */}
+      {/* Main content */}
       {activeSnapshot ? (
-        <div className="space-y-6">
-          <GearPanel items={activeSnapshot.items || []} gems={activeSnapshot.gems || []} jewels={activeSnapshot.passiveTree?.jewels} characterId={charId} />
+        <div className="space-y-5">
+          {/* Two-column: gear (left) + skills (right) */}
+          <div className="grid grid-cols-1 xl:grid-cols-[auto_1fr] gap-5 items-start">
+            <GearPanel
+              items={activeSnapshot.items || []}
+              gems={activeSnapshot.gems || []}
+              jewels={activeSnapshot.passiveTree?.jewels}
+              characterId={charId}
+            />
+            <ActiveSkillsSummary
+              gems={activeSnapshot.gems || []}
+              items={activeSnapshot.items || []}
+            />
+          </div>
 
-          <ActiveSkillsSummary gems={activeSnapshot.gems || []} items={activeSnapshot.items || []} />
-
+          {/* Passive tree — full width */}
           <PassiveTreePanel tree={activeSnapshot.passiveTree} />
         </div>
       ) : (
