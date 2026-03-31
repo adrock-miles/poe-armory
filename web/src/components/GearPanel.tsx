@@ -468,7 +468,9 @@ function GemDot({
   toggle: (id: number) => void
 }) {
   const isActive = activePopover === gemPopoverId
-  const tooltipRef = useRepositionPopover<HTMLDivElement>(isActive)
+  const [hovered, setHovered] = useState(false)
+  const showTooltip = isActive || hovered
+  const tooltipRef = useRepositionPopover<HTMLDivElement>(showTooltip)
 
   return (
     <div className="relative group/gem" data-slot="gem">
@@ -482,16 +484,15 @@ function GemDot({
           e.stopPropagation()
           toggle(gemPopoverId)
         }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       >
         {gem.iconUrl && (
           <img src={gem.iconUrl} alt={gem.name} className="w-3 h-3 object-contain" />
         )}
       </div>
-      <div className="hidden md:group-hover/gem:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 pointer-events-none">
-        <GemTooltipInner gem={gem} />
-      </div>
-      {isActive && (
-        <div ref={tooltipRef} className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50">
+      {showTooltip && (
+        <div ref={tooltipRef} className="fixed z-50" style={{ pointerEvents: isActive ? "auto" : "none" }}>
           <GemTooltipInner gem={gem} />
         </div>
       )}
@@ -550,40 +551,55 @@ function ItemPopover({
   useEffect(() => {
     const el = popoverRef.current
     if (!el) return
-    const rect = el.getBoundingClientRect()
-    // On narrow screens, center the popover horizontally in the viewport
+    const parent = el.parentElement
+    if (!parent) return
+    const parentRect = parent.getBoundingClientRect()
+    const popoverWidth = 280
+
+    // On narrow screens, anchor to bottom of viewport
     if (window.innerWidth < 400) {
-      el.style.position = "fixed"
       el.style.left = "50%"
       el.style.transform = "translateX(-50%)"
       el.style.top = "auto"
       el.style.bottom = "8px"
-      el.style.width = `${Math.min(280, window.innerWidth - 16)}px`
+      el.style.width = `${Math.min(popoverWidth, window.innerWidth - 16)}px`
       el.style.maxHeight = `${window.innerHeight * 0.6}px`
       el.style.overflowY = "auto"
       return
     }
-    if (rect.right > window.innerWidth - 8) {
-      el.style.left = "auto"
-      el.style.right = "0"
-      el.style.transform = "none"
+
+    // Center below the parent element
+    let left = parentRect.left + parentRect.width / 2 - popoverWidth / 2
+    let top = parentRect.bottom + 4
+
+    // Clamp horizontal to viewport
+    if (left + popoverWidth > window.innerWidth - 8) {
+      left = window.innerWidth - 8 - popoverWidth
     }
-    if (rect.left < 8) {
-      el.style.left = "0"
-      el.style.transform = "none"
+    if (left < 8) {
+      left = 8
     }
-    if (rect.bottom > window.innerHeight - 8) {
-      el.style.top = "auto"
-      el.style.bottom = "100%"
-      el.style.marginTop = "0"
-      el.style.marginBottom = "4px"
+
+    // If it would overflow the bottom, flip above the parent
+    const elRect = el.getBoundingClientRect()
+    if (top + elRect.height > window.innerHeight - 8) {
+      top = parentRect.top - elRect.height - 4
     }
+
+    // If it would overflow the top after flipping, clamp to top
+    if (top < 8) {
+      top = 8
+    }
+
+    el.style.left = `${left}px`
+    el.style.top = `${top}px`
+    el.style.transform = "none"
   }, [])
 
   return (
     <div
       ref={popoverRef}
-      className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-1 w-[280px] bg-[#1a1612] border border-[#3a3226] rounded-lg shadow-2xl p-3 text-left"
+      className="fixed z-50 w-[280px] bg-[#1a1612] border border-[#3a3226] rounded-lg shadow-2xl p-3 text-left"
     >
       <div className="flex items-start gap-2 mb-2">
         {item.iconUrl && (
@@ -687,7 +703,7 @@ function JewelIcon({ jewel }: { jewel: TreeJewel }) {
         )}
       </div>
       {showTooltip && (
-        <div ref={tooltipRef} className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50">
+        <div ref={tooltipRef} className="fixed z-50">
           <JewelTooltip jewel={jewel} />
         </div>
       )}
