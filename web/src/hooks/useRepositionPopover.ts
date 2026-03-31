@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
 
 /**
- * Adjusts the position of a popover element to keep it within the viewport.
+ * Positions a popover element using fixed positioning to escape overflow containers.
  * Runs once when `active` becomes true.
  */
 export function useRepositionPopover<T extends HTMLElement>(
@@ -13,24 +13,33 @@ export function useRepositionPopover<T extends HTMLElement>(
     if (!active) return
     const el = ref.current
     if (!el) return
+    const parent = el.parentElement
+    if (!parent) return
 
-    const rect = el.getBoundingClientRect()
+    const parentRect = parent.getBoundingClientRect()
+    const elRect = el.getBoundingClientRect()
 
-    if (rect.right > window.innerWidth - 8) {
-      el.style.left = "auto"
-      el.style.right = "0"
-      el.style.transform = "none"
+    // Position above the parent, centered horizontally
+    el.style.position = "fixed"
+    let left = parentRect.left + parentRect.width / 2 - elRect.width / 2
+    let top = parentRect.top - elRect.height - 4
+
+    // Clamp horizontal to viewport
+    if (left + elRect.width > window.innerWidth - 8) {
+      left = window.innerWidth - 8 - elRect.width
     }
-    if (rect.left < 8) {
-      el.style.left = "0"
-      el.style.transform = "none"
+    if (left < 8) {
+      left = 8
     }
-    if (rect.top < 8) {
-      el.style.bottom = "auto"
-      el.style.top = "100%"
-      el.style.marginBottom = "0"
-      el.style.marginTop = "4px"
+
+    // If it would overflow the top, flip below the parent
+    if (top < 8) {
+      top = parentRect.bottom + 4
     }
+
+    el.style.left = `${left}px`
+    el.style.top = `${top}px`
+    el.style.transform = "none"
   }, [active])
 
   return ref
